@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Input chemical structure for the PASS-based web apps</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+	<!-- outer CSS and JS -->
+</head>
+<body>
+	<div class="wrapper">
+	<nav class="menu">
+		<ul>
+			<li><a href="#">About</a></li>
+			<li><a href="#">Interpretation</a></li>
+			<li><a href="#">Contact</a></li>
+		</ul>
+	</nav>
+
+	<main>
+		<div class="container" id="main_container">
+			<!-- Add dropbox -->
+			<div class="container" id="mi_label_container">
+				<label for="main_input">Enter the chemical structure in SMILES or MOL format OR drop file with the structure (TXT, SMI, MOL, SDF):</label>
+			</div>
+			<div class="spacer"> <p></p> </div>
+			<div class="container" id="mi_container">
+				<textarea type="text" id="main_input" name="main_input" minlength="4" maxlength="4000" rows="30" cols="120" required></textarea>
+			</div>
+			<div class="container" id="mi_btn_container">
+				<button class="btn_send" type="button" id="mi_btn">Predict</button>
+			</div>
+				<button class="btn_invoke" type="button" id="marvi_btn">Draw</button>
+		</div>
+	</main>
+	<!-- SEE: https://developer.mozilla.org/en-US/docs/Web/CSS/Layout_cookbook/Sticky_footers -->
+	<footer class="ftr_page">
+		<p class="text-muted">Way2Drug &#169 2011 - <script type="text/javascript">document.write(new Date().getFullYear());</script> | 
+			<a href="http://way2drug.com/prpol.php" target="_blank">Privacy Policy </a>  The work was performed in the framework of the State Academies of Sciences Basic Research programm for 2020-2030.
+		</p>
+	</footer>
+	</div>
+</body>
+<dialog>
+  <button autofocus>Close</button>
+  <p>... ABOUT ...</p>
+</dialog>
+</html>
+
+<script type="text/javascript">
+	
+</script>
+
+<style type="text/css">
+* {
+  box-sizing: inherit;
+}
+html {
+  height: 100%;
+  box-sizing: border-box;
+  background: #cecece;
+}
+body {
+  height: 99.1%;
+  font: 1.2em sans-serif;
+  background: #ecf0f1;
+}
+/* SEE: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/nav */
+nav ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+nav ul li {
+  float: right;
+}
+nav ul li a {
+  display: block;
+  color: black;
+  text-align: center;
+  padding: 14px 20px;
+  text-decoration: none;
+}
+
+nav ul li a:hover {
+  background-color: #ecf0f1;
+}
+.wrapper {
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+.menu {
+  background: linear-gradient(#bdc3c7, #ecf0f1);
+  border-color: #bdc3c7 transparent #ecf0f1 transparent;
+  color: black;
+  padding: 5px;
+}
+.ftr_page {
+  background: linear-gradient(#ecf0f1, #bdc3c7);
+  color: black;
+  padding: 5px;
+}
+.body {
+  padding: 20px;
+}
+</style>
