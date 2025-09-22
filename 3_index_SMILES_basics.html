@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Input chemical structure for the PASS-based web apps</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+	<!-- outer CSS and JS -->
+</head>
+<body>
+	<div class="wrapper">
+
+	<nav class="menu">
+		<ul>
+			<!-- SEE:
+			https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/javascript
+			https://developer.mozilla.org/ru/docs/Web/HTML/Reference/Elements/dialog -->
+			<li><a id="open_contact" href="javascript:open_contact()">Contact</a></li>
+			<li><a id="open_interp" href="javascript:open_interp()">Interpretation</a></li>
+			<li><a id="open_about" href="javascript:open_about()">About</a></li>
+		</ul>
+	</nav>
+
+	<main>
+		<!-- Add dropbox -->
+		<div class="container" id="main_container">
+			<div class="spacer" id="spacer_1"> <p></p> </div>
+			<div class="container" id="mi_label_container">
+				<label for="main_input" id="mi_input">Enter the chemical structure:</label>
+			</div>
+			<div class="spacer"id="spacer_2"> <p></p> </div>
+			<div class="container" id="mi_container">
+				<textarea type="text" id="main_input" name="main_input" minlength="4" maxlength="4000" required></textarea>
+			</div>
+			<div class="spacer" id="spacer_3"> <p></p> </div>
+			<div class="container" id="mi_btn_container">
+				<button class="btn_send" type="button" id="mi_btn">Predict</button>
+				<button class="btn_invoke" type="button" id="marvi_btn">Draw</button>
+			</div>
+			<div class="spacer" id="spacer_4"> <p></p> </div>
+		</div>
+	</main>
+
+	<!-- SEE: https://developer.mozilla.org/en-US/docs/Web/CSS/Layout_cookbook/Sticky_footers -->
+	<footer>
+		<p class="text" id="footer_txt">Way2Drug &#169 2011 - <script type="text/javascript">document.write(new Date().getFullYear());</script> | 
+			<a href="http://way2drug.com/prpol.php" target="_blank">Privacy Policy </a>
+			The work was performed in the framework of the State Academies of Sciences Basic Research programm for 2020-2030.
+		</p>
+	</footer>
+
+	</div>
+</body>
+<dialog class="dlg_off" id="about_dlg">
+	<header class="dlg_header"><h1>About</h1></header>
+	<div class="dlg_div"><p>... tool description ...</p></div>
+  <div id="btn_close_about" class="dlg_btn"><button autofocus>Close</button></div>
+</dialog>
+<dialog class="dlg_off" id="interp_dlg">
+	<header class="dlg_header"><h1>Intrpretation</h1></header>
+	<div class="dlg_div"><p>... interpretation of the results ...</p></div>
+  <div id="btn_close_interp" class="dlg_btn"><button autofocus>Close</button></div>
+</dialog>
+<dialog class="dlg_off" id="contact_dlg">
+	<header class="dlg_header"><h1>Contacts</h1></header>
+	<div class="dlg_div"><p>... Email or smth ...</p></div>
+  <div id="btn_close_contact" class="dlg_btn"><button autofocus>Close</button></div>
+</dialog>
+</html>
+
+<script type="text/javascript">
+//Functions
+function open_about() {
+	const dlg = document.querySelector("#about_dlg");
+	dlg.showModal();
+	dlg.className = "dlg_on";
+}
+function open_interp() {
+	const dlg = document.querySelector("#interp_dlg");
+	dlg.showModal();
+	dlg.className = "dlg_on";
+}
+function open_contact() {
+	const dlg = document.querySelector("#contact_dlg");
+	dlg.showModal();
+	dlg.className = "dlg_on";
+}
+function close_dlg() {
+	const dlg = document.querySelector(".dlg_on"); 
+	dlg.showModal();
+	dlg.close();
+	dlg.className = "dlg_off";
+}
+function send_txt() {
+	const smiles_symbols = new Set(["C", "c", "1", "(", "-", "n", "2", "=", "O", ")", "[", "H", "]", "l", "#", "N", "3", "B", "r", "S", "+", "/", "I", "\\", "4", "s", "5", "F", "o", "@", "6", "7", "8", "9", "%", "0", ".", "P", "a", "i", "L", "K", "e", "t", "T", "Z", "M", "g", "A", "p", "R", "b", "X", "G"]);
+	const txt_area = document.querySelector("#main_input");
+	const txt_val_raw = txt_area.value.trim();
+	//Check if mol
+	if (txt_val_raw.indexOf("M END") > -1) {
+		alert("Smth like MOL was entered, it is not supported at the moment");
+		return;
+	}
+	//Check SMILES
+	//Select the first line
+	let txt_val_frst;
+	if (txt_val_raw.indexOf('\n') > -1 ) {
+		txt_val_frst = txt_val_raw.trim().slice(0, txt_val_raw.indexOf('\n')).trim();
+	} else {
+		txt_val_frst = txt_val_raw.trim();
+	}
+	//Check length, 500 symbols is the top for SMILES of small compounds based on ChEMBL data
+	if(txt_val_frst.length > 500) {
+		alert("Input line is too long");
+		return;
+	}
+	//Check if input includes only symbols common in SMILES strings: select all SMILES from ChEMBL v35 (https://www.ebi.ac.uk/chembl), read as single string, explode into the vector of chacters, get unique symbols and here we are:
+	// !!! this is the preliminary attempt to validate input string, should not be used without tests and considering OpenSMILES standard, for example, SEE: http://opensmiles.org/opensmiles.html
+	const input_symbols = new Set(txt_val_frst);
+	const symbol_diff = input_symbols.difference(smiles_symbols);
+	if (symbol_diff.size > 0) {
+		const symbol_diff_str = Array.from(symbol_diff).join('\r\n').replace(" ", "\" \"");
+		alert('The following is not common in SMILES: ' + '\r\n' + symbol_diff_str + '\r\n' + 'Please, consider something more trivial');
+		return;
+	}
+	// * is OK
+	alert('Input string seems to be fine and could be processed further');
+	return;
+
+}
+//Buttons
+const btn_close_about = document.querySelector("#btn_close_about");
+const btn_close_interp = document.querySelector("#btn_close_interp");
+const btn_close_contact = document.querySelector("#btn_close_contact");
+const btn_send_txt = document.querySelector("#mi_btn");
+//Buttons & events
+btn_close_about.addEventListener("click", close_dlg, false);
+btn_close_interp.addEventListener("click", close_dlg, false);
+btn_close_contact.addEventListener("click", close_dlg, false);
+btn_send_txt.addEventListener("click", send_txt, false);
+
+</script>
+
+<style type="text/css">
+* {
+  box-sizing: inherit;
+}
+html {
+  height: 100%;
+  box-sizing: border-box;
+  background: #cecece;
+}
+body {
+	min-height: 99%;
+  height: 99%;
+  font: 1.2em roboto;
+  background: #ecf0f1;
+  display: grid;
+  grid-template-rows: 1fr;
+}
+dialog::backdrop {
+	backdrop-filter: blur(3px) brightness(60%) sepia(10%) !important;
+}
+nav {
+	 min-height: 20px;
+	 grid-column: 1/4;
+	 grid-row: 1;
+}
+main {
+	min-height: 100%;
+	grid-column: 2;
+	grid-row: 2;
+}
+textarea {
+	min-width: 100%;
+	min-height: 100%;
+}
+footer {
+	min-height: 20px;
+  background: linear-gradient(#ecf0f1, #bdc3c7);
+  color: black;
+  grid-column: 1/4;
+	grid-row: 3;
+}
+/* SEE: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/nav */
+nav ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+nav ul li {
+  float: right;
+}
+nav ul li a {
+  display: block;
+  color: black;
+  text-align: center;
+  padding: 14px 20px;
+  text-decoration: none;
+}
+
+nav ul li a:hover {
+  background-color: #ecf0f1;
+}
+.wrapper {
+	grid-row: 1;
+  min-height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 8fr 1fr;
+  grid-template-rows: 1fr 8fr 1fr;
+}
+.menu {
+  background: linear-gradient(#bdc3c7, #ecf0f1);
+  border-color: #bdc3c7 transparent #ecf0f1 transparent;
+  color: black;
+  padding: 5px;
+}
+.dlg_on {
+	min-height: 50vh;
+	min-width: 70%;
+	display: grid;
+	grid-template-columns: 1fr;
+	grid-template-rows: 1fr 8fr 1fr;
+}
+.dlg_off {
+	display: none;
+}
+.dlg_header {
+	min-height: 80px;
+}
+.dlg_div {
+	min-height: 100%;
+}
+.dlg_btn {
+	min-height: 30px;
+}
+#main_container{
+	height: 100%;
+	width: 100%;
+	min-height: 100%;
+	min-width: 100%;
+	display: grid;
+	grid-template-columns: 1fr;
+	grid-template-rows: 1fr 1fr 0.25fr 10fr 0.25fr 1fr 1fr;
+}
+#spacer_1 {
+  grid-row: 1;
+  min-height: 5px;
+}
+#mi_label_container {
+  grid-row: 2;
+  min-height: 5vh;
+}
+#spacer_2 {
+  grid-row: 3;
+  min-height: 12.5px;
+}
+#mi_container {
+	min-height: 100%;
+	min-width: 100%;
+  grid-row: 4;
+}
+#spacer_3 {
+  grid-row: 5;
+  min-height: 2.5px;
+}
+#mi_btn_container {
+  grid-row: 6;
+  min-height: 12.5px;
+}
+#spacer_3 {
+  grid-row: 7;
+  min-height: 5px;
+}
+#footer_txt {
+	text-align: center;
+}
+</style>
