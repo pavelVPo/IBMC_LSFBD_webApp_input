@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Input chemical structure for the PASS-based web apps</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+	<!-- outer CSS and JS -->
+</head>
+<body>
+	<div class="wrapper">
+
+	<nav class="menu">
+		<ul>
+			<li><a href="#">About</a></li>
+			<li><a href="#">Interpretation</a></li>
+			<li><a href="#">Contact</a></li>
+		</ul>
+	</nav>
+
+	<main>
+		<!-- Add dropbox -->
+		<div class="container" id="main_container">
+			<div class="spacer" id="spacer_1"> <p></p> </div>
+			<div class="container" id="mi_label_container">
+				<label for="main_input" id="mi_input">Enter the chemical structure:</label>
+			</div>
+			<div class="spacer"id="spacer_2"> <p></p> </div>
+			<div class="container" id="mi_container">
+				<textarea type="text" id="main_input" name="main_input" minlength="4" maxlength="4000" required></textarea>
+			</div>
+			<div class="spacer" id="spacer_3"> <p></p> </div>
+			<div class="container" id="mi_btn_container">
+				<button class="btn_send" type="button" id="mi_btn">Predict</button>
+				<button class="btn_invoke" type="button" id="marvi_btn">Draw</button>
+			</div>
+			<div class="spacer" id="spacer_4"> <p></p> </div>
+		</div>
+	</main>
+
+	<!-- SEE: https://developer.mozilla.org/en-US/docs/Web/CSS/Layout_cookbook/Sticky_footers -->
+	<footer>
+		<p class="text" id="footer_txt">Way2Drug &#169 2011 - <script type="text/javascript">document.write(new Date().getFullYear());</script> | 
+			<a href="http://way2drug.com/prpol.php" target="_blank">Privacy Policy </a>
+			The work was performed in the framework of the State Academies of Sciences Basic Research programm for 2020-2030.
+		</p>
+	</footer>
+
+	</div>
+</body>
+<dialog>
+  <button autofocus>Close</button>
+  <p>... ABOUT ...</p>
+</dialog>
+</html>
+
+<script type="text/javascript">
+	
+</script>
+
+<style type="text/css">
+* {
+  box-sizing: inherit;
+}
+html {
+  height: 100%;
+  box-sizing: border-box;
+  background: #cecece;
+}
+body {
+	min-height: 99%;
+  height: 99%;
+  font: 1.2em roboto;
+  background: #ecf0f1;
+  display: grid;
+  grid-template-rows: 1fr;
+}
+nav {
+	 min-height: 20px;
+	 grid-column: 1/4;
+	 grid-row: 1;
+}
+main {
+	min-height: 100%;
+	grid-column: 2;
+	grid-row: 2;
+}
+textarea {
+	min-width: 100%;
+	min-height: 100%;
+}
+footer {
+	min-height: 20px;
+  background: linear-gradient(#ecf0f1, #bdc3c7);
+  color: black;
+  grid-column: 1/4;
+	grid-row: 3;
+}
+/* SEE: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/nav */
+nav ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+nav ul li {
+  float: right;
+}
+nav ul li a {
+  display: block;
+  color: black;
+  text-align: center;
+  padding: 14px 20px;
+  text-decoration: none;
+}
+
+nav ul li a:hover {
+  background-color: #ecf0f1;
+}
+.wrapper {
+	grid-row: 1;
+  min-height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 8fr 1fr;
+  grid-template-rows: 1fr 8fr 1fr;
+}
+.menu {
+  background: linear-gradient(#bdc3c7, #ecf0f1);
+  border-color: #bdc3c7 transparent #ecf0f1 transparent;
+  color: black;
+  padding: 5px;
+}
+#main_container{
+	height: 100%;
+	width: 100%;
+	min-height: 100%;
+	min-width: 100%;
+	display: grid;
+	grid-template-columns: 1fr;
+	grid-template-rows: 1fr 1fr 0.25fr 10fr 0.25fr 1fr 1fr;
+}
+#spacer_1 {
+  grid-row: 1;
+  min-height: 5px;
+}
+#mi_label_container {
+  grid-row: 2;
+  min-height: 5vh;
+}
+#spacer_2 {
+  grid-row: 3;
+  min-height: 12.5px;
+}
+#mi_container {
+	min-height: 100%;
+	min-width: 100%;
+  grid-row: 4;
+}
+#spacer_3 {
+  grid-row: 5;
+  min-height: 2.5px;
+}
+#mi_btn_container {
+  grid-row: 6;
+  min-height: 12.5px;
+}
+#spacer_3 {
+  grid-row: 7;
+  min-height: 5px;
+}
+#footer_txt {
+	text-align: center;
+}
+</style>
