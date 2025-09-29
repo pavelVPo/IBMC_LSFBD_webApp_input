@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Input chemical structure for the PASS-based web apps</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+	<!-- outer CSS and JS -->
+</head>
+<body>
+	<div class="wrapper">
+
+	<nav class="menu">
+		<ul>
+			<!-- SEE:
+			https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/javascript
+			https://developer.mozilla.org/ru/docs/Web/HTML/Reference/Elements/dialog -->
+			<li><a id="open_contact" href="javascript:open_contact()">Contact</a></li>
+			<li><a id="open_interp" href="javascript:open_interp()">Interpretation</a></li>
+			<li><a id="open_about" href="javascript:open_about()">About</a></li>
+		</ul>
+	</nav>
+
+	<main>
+		<!-- Add dropbox -->
+		<div class="container" id="main_container">
+			<div class="spacer" id="spacer_1"> <p></p> </div>
+			<div class="container" id="mi_label_container">
+				<label for="main_input" id="mi_input">Enter the chemical structure (SMILES only at the moment and all the processing is highly experimental and in development, not for production):</label>
+			</div>
+			<div class="spacer"id="spacer_2"> <p></p> </div>
+			<div class="container" id="mi_container">
+				<textarea type="text" id="main_input" name="main_input" minlength="4" maxlength="4000" required></textarea>
+			</div>
+			<div class="spacer" id="spacer_3"> <p></p> </div>
+			<div class="container" id="mi_btn_container">
+				<button class="btn_send" type="button" id="mi_btn">Test parser</button>
+				<button class="btn_invoke" type="button" id="marvi_btn">Draw</button>
+			</div>
+			<div class="spacer" id="spacer_4"> <p></p> </div>
+		</div>
+	</main>
+
+	<!-- SEE: https://developer.mozilla.org/en-US/docs/Web/CSS/Layout_cookbook/Sticky_footers -->
+	<footer>
+		<p class="text" id="footer_txt">Way2Drug &#169 2011 - <script type="text/javascript">document.write(new Date().getFullYear());</script> | 
+			<a href="http://way2drug.com/prpol.php" target="_blank">Privacy Policy </a>
+			The work was performed in the framework of the State Academies of Sciences Basic Research programm for 2020-2030.
+		</p>
+	</footer>
+
+	</div>
+</body>
+<dialog class="dlg_off" id="about_dlg">
+	<header class="dlg_header"><h1>About</h1></header>
+	<div class="dlg_div"><p>... tool description ...</p></div>
+  <div id="btn_close_about" class="dlg_btn"><button autofocus>Close</button></div>
+</dialog>
+<dialog class="dlg_off" id="interp_dlg">
+	<header class="dlg_header"><h1>Intrpretation</h1></header>
+	<div class="dlg_div"><p>... interpretation of the results ...</p></div>
+  <div id="btn_close_interp" class="dlg_btn"><button autofocus>Close</button></div>
+</dialog>
+<dialog class="dlg_off" id="contact_dlg">
+	<header class="dlg_header"><h1>Contacts</h1></header>
+	<div class="dlg_div"><p>... Email or smth ...</p></div>
+  <div id="btn_close_contact" class="dlg_btn"><button autofocus>Close</button></div>
+</dialog>
+</html>
+
+<script type="text/javascript">
+////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////
+//Functions and some data to deal with SMILES
+////////////////////////////////////////////////////////////////////////////////////////////////
+// Some data
+// according to OpenSMILES (http://opensmiles.org/opensmiles.html)
+const aromatics_map = new Map();
+const aromatics_set = new Set(['b', 'c', 'n', 'o', 'p', 's', 'as', 'se', 'te']);
+const organic_set = new Set(['B', 'C', 'N', 'O', 'P', 'S', 'F', 'Cl', 'Br', 'I', 'b', 'c', 'n', 'o', 'p', 's']);
+const bonds_set = new Set(['-', '=', '#', '$', ':', '\\', '/']);
+//Allowed characters based on the analysis of SMILES from ChEMBL v35, excluding "." - multicomponent structures are not allowed.
+const smiles_chars = new Set(["C", "c", "1", "(", "-", "n", "2", "=", "O", ")", "[", "H", "]", "l", "#", "N", "3", "B", "r", "S", "+", "/", "I", "\\", "4", "s", "5", "F", "o", "@", "6", "7", "8", "9", "%", "0", ".", "P", "a", "i", "L", "K", "e", "t", "T", "Z", "M", "g", "A", "p", "R", "b", "X", "G"]);
+//SEE: https://en.wikipedia.org/wiki/List_of_chemical_elements
+const atom_symbols = new Set(["H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr", "Rf", "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn", "Nh", "Fl", "Mc", "Lv", "Ts", "Og", "b", "c", "n", "o", "s", "p", "te", "as", "se"]);
+const bonds_map = new Map();
+//Add valences to aromatics
+aromatics_map.set("b", new Set([3]));
+aromatics_map.set("c", new Set([4]));
+aromatics_map.set("n", new Set([3,5]));
+aromatics_map.set("o", new Set([2]));
+aromatics_map.set("p", new Set([3,5]));
+aromatics_map.set("s", new Set([2,4,6]));
+//Add `valences` to bonds
+bonds_map.set("-", [1]);
+bonds_map.set("=", [2]);
+bonds_map.set("#", [3]);
+bonds_map.set("$", [4]);
+bonds_map.set(":", [1]);
+bonds_map.set("\\", [1]);
+bonds_map.set("/", [1]);
+
+// General functions
+/////////////////////////////////////////////////////////////////////////////
+// 0	Clear stereocenters									              //
+///////////////////////////////////////////////////////////////////////////
+function clear_stereo (smiles) {
+	smiles = smiles.replaceAll("@TB20", "");
+	smiles = smiles.replaceAll("@OH30", "");
+	smiles = smiles.replaceAll(/@TB1[0-9]/g, "");
+	smiles = smiles.replaceAll(/@OH1[0-9]/g, "");
+	smiles = smiles.replaceAll(/@OH2[0-9]/g, "");
+	smiles = smiles.replaceAll(/@TB[1-9]/g, "");
+	smiles = smiles.replaceAll(/@OH[1-9]/g, "");
+	smiles = smiles.replaceAll("@TH1", "");
+	smiles = smiles.replaceAll("@AL1", "");
+	smiles = smiles.replaceAll("@AL2", "");
+	smiles = smiles.replaceAll("@SP1", "");
+	smiles = smiles.replaceAll("@SP2", "");
+	smiles = smiles.replaceAll("@SP3", "");
+	smiles = smiles.replaceAll("@@", "");
+	smiles = smiles.replaceAll("@", "");
+
+	return(smiles);
+}
+
+// Functions to get atom descriptions:
+
+/////////////////////////////////////////////////////////////////////////////
+// 1	Get Isotope from the fragment of SMILES corresponding to the atom //
+///////////////////////////////////////////////////////////////////////////
+// Position -> in atom str
+function get_isotope (atom_str, position) {
+	let isotope = "";
+	let is_isotope = 0;
+	if ((/[0-9]/).test(atom_str[position])) {
+		is_isotope = 1;
+		isotope = isotope + atom_str[position];
+		position++
+		//Get the whole isotope label
+		while ((/[0-9]/).test(atom_str[position])) {
+			isotope = isotope + atom_str[position];
+			position++
+		}
+	}
+	return {"position": position, "is_isotope": is_isotope, "isotope": isotope};
+}
+
+////////////////////////////////////////////////////////////////////////////
+// 2	Get Symbol from the fragment of SMILES corresponding to the atom //
+//////////////////////////////////////////////////////////////////////////
+function get_symbol_bracket (atom_str, position) {
+	let atom_symbol = "";
+	while ( (/[a-zA-Z]/).test(atom_str[position]) ) {
+		atom_symbol = atom_symbol + atom_str[position];
+		position++
+		if (position >= atom_str.length) {
+			return {"msg": 'Unable to parse part of the input: ' + '\r\n' + atom_str + '...\r\n' + 'Please, make corrections or consider alternative input'};		
+		}
+	}
+	return {"position": position, "symbol": atom_symbol};
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// 3	Skip chirality in the fragment of SMILES corresponding to the atom //
+////////////////////////////////////////////////////////////////////////////
+function skip_chirality (atom_str, position) {
+	while (atom_str[position] === '@') {
+			position++
+	}
+	if ((/TH1|TH2/).test(atom_str.substring(position, position+4))) {
+		position = position + 3;
+	}
+	if ((/AL1|AL2/).test(atom_str.substring(position, position+4))) {
+		position = position + 3;
+	}
+	if ((/SP1|SP2|SP3/).test(atom_str.substring(position, position+4))) {
+		position = position + 3;
+	}
+	if ((/TB[0-9][0-9]/).test(atom_str.substring(position, position+5))) {
+		position = position + 4;
+	}
+	if ((/OH[0-9][0-9]/).test(atom_str.substring(position, position+5))) {
+		position = position + 4;
+	}
+	if ((/TB[0-9]/).test(atom_str.substring(position, position+4))) {
+		position = position + 3;
+	}
+	if ((/OH[0-9]/).test(atom_str.substring(position, position+4))) {
+		position = position + 3;
+	}
+	return position;
+}
+
+/////////////////////////////////////
+// 4	Get H-status and H-count  //
+///////////////////////////////////
+//Position should correspond to the H at the moment
+function get_h (atom_str, position) {
+	let explH = 0;
+	let explH_count = 0;
+	if (atom_str[position] === "H") {
+		position++;
+		explH = 1;
+		if ( (/[0-9]/).test(atom_str[position]) ) {
+			explH_count = atom_str[position];
+			position++
+		} else {
+			explH_count = explH;
+		}
+	}
+	return {"position": position, "explH": explH, "explH_count": explH_count};
+}
+
+///////////////////////////////////////////////
+// 4	Get Charge  			            //
+/////////////////////////////////////////////
+function get_charge (atom_str, position) {
+	let is_charged = 0;
+	let charge_qual = "";
+	let charge_quant = 0;
+	if ( (/\-|\+/).test(atom_str[position]) ) {
+		is_charged = 1;
+		charge_qual = atom_str[position];
+		charge_quant = 1;
+		position++;
+		//Check for quantifier
+		if (atom_str[position] === charge_qual) {
+			charge_quant = 2;
+			position++;
+		} else {
+			//Digital quantifier
+			if ((/[0-9]/).test(atom_str[position])) {
+				if ((/[0-9]/).test(atom_str[position + 1])) {
+					charge_quant = atom_str[position] + atom_str[position + 1];
+					position++;
+					position++;
+				} else {
+					charge_quant = atom_str[position];
+					position++
+				}
+			}
+		}
+	}
+	return {"position": position, "is_charged": is_charged, "charge_qual": charge_qual, "charge_quant": charge_quant};
+}
+
+// Functions to get smth during the backward search
+
+///////////////////////////////////////////////////////////////////////////////////
+// 5	Check bonds earlier, depending on the result, the bond should be added	//
+/////////////////////////////////////////////////////////////////////////////////
+function pre_bond_get (position, atom_start, smiles, atom_bonds, bonds_set) {
+	let found = 0;
+	let bond = "";
+	if (bonds_set.has(smiles[atom_start-1])) {
+		found ++
+		atom_start = atom_start-1;
+		bond = smiles[atom_start];
+		//Problem, report:
+		if (atom_start === 0) {
+			return {"msg": 'Unable to parse input starting with bond: ' + '\r\n' + smiles.substring(0, position) + '...\r\n' + 'Please, make corrections or consider alternative input'};
+		}
+		return {"found": found, "atom_start": atom_start, "bond": bond};
+	}
+}
+//If found -> there is no need to add the bond latter
+
+///////////////////////////////////////////////
+// 6	Find prev if ")"         		    //
+/////////////////////////////////////////////
+function prev_atom_get_main (position, atom_start, smiles) {
+	let connected_position = -1;
+	if (smiles[atom_start-1] === ")") {
+		let open_branch = 1;
+		for (let k = atom_start-2; k >= 0; k--) {
+			//Count '(' / ')'
+			if (smiles[k] === ')') {
+				open_branch++;
+			}
+			if (smiles[k] === '(') {
+				open_branch--;
+			}
+			k--
+			if (smiles[k] === ')') {
+				open_branch++;
+			}
+			if (smiles[k] === '(') {
+				open_branch--;
+			}
+			if (open_branch === 0) {
+				connected_position = k-1;
+				break;
+			}
+			if (k === 0) {
+				return {"msg"	:'Unable to find the opening bracket "(" not in the first position in: ' + '\r\n' + smiles.substring(0, position) + '\r\n' + 'Please, make corrections or consider alternative input'};
+			}
+		}
+	return {"position": position, "atom_start": atom_start, "connected_position": connected_position};	
+	} else {
+	return "not_the_case";
+	}
+}
+
+///////////////////////////////////////////////
+// 7	Find prev if "("         		    //
+/////////////////////////////////////////////
+function prev_atom_get_frombranch (position, atom_start, smiles) {
+	let connected_position = -1;
+	if ( smiles[atom_start-1] === "(" ) {
+		atom_start--
+		let pointer = atom_start-1;
+		for (let k = pointer; k >= 0; k--) {
+			if (k === 0) {
+				return {"msg": "Unable to parse input starting with '(': " + "\r\n" + smiles.substring(0, position) + "...\r\n" + "Please, make corrections or consider alternative input"}
+			}
+			if (smiles[k] === "(") {
+				pointer = k;
+				continue;
+			} else {
+				pointer = k;
+				break;
+			}
+		}
+		if (smiles[pointer] != ")") {
+			connected_position = pointer;
+			return {"position": position, "atom_start": atom_start, "connected_position": connected_position};
+		} else {
+			let open_branch = 1;
+			for (let k = pointer-1; k >= 0; k--) {
+				//Count '(' / ')'
+				if (smiles[k] === ')') {
+					open_branch++;
+				}
+				if (smiles[k] === '(') {
+					open_branch--;
+				}
+				k--
+				if (smiles[k] === ')') {
+					open_branch++;
+				}
+				if (smiles[k] === '(') {
+					open_branch--;
+				}
+				if (open_branch === 0) {
+					connected_position = k-1;
+					break;
+				}
+				if (k === 0) {
+					return {"msg":"Unable to find the opening bracket '(' not in the first position in: " + "\r\n" + smiles.substring(0, position) + "\r\n" + "Please, make corrections or consider alternative input"};
+				}
+			}
+			return {"position": position, "atom_start": atom_start, "connected_position": connected_position};
+		}
+	} else {
+		return "not_the_case";
+	}
+}
+
+///////////////////////////////////////////////
+// 8	Find prev if "DIGIT"       		    //
+/////////////////////////////////////////////
+function prev_atom_get_digit (atom_start, smiles) {
+	let connected_position;
+	if ( (/[0-9]/).test(smiles[atom_start-1]) ) {
+		connected_position = atom_start-1;
+		return {"atom_start": atom_start, "connected_position": connected_position};
+	} else {
+		return "not_the_case";
+	}
+}
+
+///////////////////////////////////////////////////////
+// 9	Find prev if exactly atom       		    //
+/////////////////////////////////////////////////////
+function prev_atom_get_atom (atom_start, smiles) {
+	let connected_position;
+	if ( organic_set.has(smiles[atom_start-1]) | smiles[atom_start-1] == "]" ) {
+		connected_position = atom_start-1;
+		return {"atom_start": atom_start, "connected_position": connected_position};
+	} else {
+		return "not_the_case";
+	}
+}
+
+// Functions to get smth during the forward search
+
+///////////////////////////////////////////////////////
+// 10	Get ring info from SMILES	       		    //
+/////////////////////////////////////////////////////
+function next_get_rings (position, atom_end, smiles) {
+	position++
+	let ring_str = "";
+	let ring_positions = new Set();
+	let ring_start;
+	if ( (/[0-9]|\%/).test(smiles[position]) ) {
+		ring_start = position;
+		ring_str = ring_str + smiles[position];
+		ring_positions.add(position);
+		atom_end = position;
+		position++
+		while ( (/[0-9]|'%/).test(smiles[position]) ) {
+			ring_str = ring_str + smiles[position];
+			ring_positions.add(position);
+			atom_end = position;
+			position++
+		}
+	}
+	return {"position": position, "atom_end": atom_end, "ring_str": ring_str, "ring_positions": ring_positions, "ring_start": ring_start};
+}
+
+///////////////////////////////////////////////////////
+// 11	Parse ring info into the distinct rings     //
+/////////////////////////////////////////////////////
+function parse_ring_str (ring_start, ring_str) {
+	let rings = [];
+	for (let i = 0; i < ring_str.length; i++) {
+		if (ring_str[i] === '%') {
+			let this_ring = {};
+			let this_ring_str = ring_str[i] + ring_str[i+1] + ring_str[i+2];
+			let this_ring_pos = new Set([ring_start + i, ring_start + i + 1, ring_start + i + 2]);
+			this_ring.str = this_ring_str;
+			this_ring.pos = this_ring_pos;
+			rings.push(this_ring);
+			i = i + 3;
+		}
+		if ( (/[0-9]/).test(ring_str[i]) ) {
+			let this_ring = {};
+			let this_ring_str = ring_str[i];
+			let this_ring_pos = new Set([ring_start + i]);
+			this_ring.str = this_ring_str;
+			this_ring.pos = this_ring_pos;
+			rings.push(this_ring);
+		}
+	}
+	return rings;
+}
+
+///////////////////////////////////////////////////////
+// 12	Check if this ring is closed				//
+/////////////////////////////////////////////////////
+function check_ring (this_ring, closed_rings) {
+	if ( closed_rings.intersection(this_ring.pos).size === 0 ) {
+		return "close this ring";
+	} else {
+		return "this ring is closed";
+	}
+}
+
+///////////////////////////////////////////////////////
+// 13	Find the end of this ring					//
+/////////////////////////////////////////////////////
+function end_ring (atom_end, this_ring, smiles) {
+	let ring_symbol = this_ring.str;
+	let ring_pattern = new RegExp(ring_symbol + "(?![^\\[*]})", "g");
+	let ring_end = smiles.substring(atom_end+1, smiles.length).search(ring_pattern);
+	if (ring_end > -1) {
+		return {"end_start": ring_end + atom_end + 1, "end_end": ring_end + atom_end + 1 + ring_symbol.length -1};
+	} else {
+		return -1;
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////
+//General Functions
+////////////////////////////////////////////////////////////////////////////////////////////////
+function open_about() {
+	const dlg = document.querySelector("#about_dlg");
+	dlg.showModal();
+	dlg.className = "dlg_on";
+}
+function open_interp() {
+	const dlg = document.querySelector("#interp_dlg");
+	dlg.showModal();
+	dlg.className = "dlg_on";
+}
+function open_contact() {
+	const dlg = document.querySelector("#contact_dlg");
+	dlg.showModal();
+	dlg.className = "dlg_on";
+}
+function close_dlg() {
+	const dlg = document.querySelector(".dlg_on"); 
+	dlg.showModal();
+	dlg.close();
+	dlg.className = "dlg_off";
+}
+function send_txt() {
+	const txt_area = document.querySelector("#main_input");
+	const txt_val_raw = txt_area.value.trim();
+	//Check if mol
+	if (txt_val_raw.indexOf("M END") > -1) {
+		alert("Smth like MOL was entered, it is not supported at the moment");
+		return;
+	}
+	//Check SMILES
+	//Select the first line
+	let txt_val_frst;
+	if (txt_val_raw.indexOf('\n') > -1 ) {
+		txt_val_frst = txt_val_raw.trim().slice(0, txt_val_raw.indexOf('\n')).trim();
+	} else {
+		txt_val_frst = txt_val_raw.trim();
+	}
+	//Check length, 500 symbols is the top for SMILES of small compounds based on ChEMBL data
+	if(txt_val_frst.length > 500) {
+		alert("Input line is too long");
+		return;
+	}
+	//Check if input includes only symbols common in SMILES strings: select all SMILES from ChEMBL v35 (https://www.ebi.ac.uk/chembl), read as single string, explode into the vector of chacters, get unique symbols and here we are:
+	// !!! this is the preliminary attempt to validate input string, should not be used without tests and considering OpenSMILES standard, for example, SEE: http://opensmiles.org/opensmiles.html
+/*	const input_symbols = new Set(txt_val_frst);
+	const symbol_diff = input_symbols.difference(smiles_symbols);
+	if (symbol_diff.size > 0) {
+		const symbol_diff_str = Array.from(symbol_diff).join('\r\n').replace(" ", "\" \"");
+		alert('The following is not common in SMILES: ' + '\r\n' + symbol_diff_str + '\r\n' + 'Please, consider something more trivial');
+		return;
+	}
+*/
+	//Process SMILES
+	//Clear stereo
+	smiles = clear_stereo(txt_val_frst);
+	console.log(smiles);
+	//create data structures to store the vmolecule
+	mol_raw = [];
+	//create set to store the positions of the already connected rings
+	let closed_rings = new Set();
+	let atom_id = -1;
+	//Traverse the SMILES from Left to Right
+	smiles_traversal: for (let i = 0; i < smiles.length; i++) {
+		//Create variable to distinguish between the bracketed atoms and atoms from organic subset
+		let bracketed = 0;
+		let organic = 0;
+		//Declare the variables to store the characteristics of the atom
+		let atom;
+		let atom_start = -1;
+		let atom_end = -1;
+		// Basic descriptors
+		let explH;
+		let explH_count;
+		let is_charged;
+		let is_aromatic;
+		let charge_qual;
+		let charge_quant;
+		let is_isotope;
+		let isotope;
+		let atom_symbol;
+		let atom_bonds;
+		// Store connections
+		let connected_positions;
+		//Check if current position belongs to the bracketed atom and characterize it
+		if ( smiles[i] === '[') {
+			console.log("Atom:  " + i);
+			bracketed = 1;
+			//Initialize the variables to store the characteristics of the atom
+			atom = {};
+			// Basic descriptors
+			explH = 0;
+			explH_count = 0;
+			is_charged = 0;
+			is_aromatic = 0;
+			charge_qual = "";
+			charge_quant = 0;
+			is_isotope = 0;
+			isotope = "";
+			atom_symbol = "";
+			atom_bonds = [];
+			// Store connections
+			let connected_positions = [];
+			//positions
+			atom_start = i;
+			atom_end = i;
+			//New atom
+			atom_id++;
+			atom.atom_id = atom_id;
+			atom.bonds = [];
+			
+			//Get the whole atom substr
+			let pos_end = i;
+			close_sqbracket: for (let k = i+1; k < smiles.length; k++) {
+				if (smiles[k] === ']') {
+					pos_end++
+					break close_sqbracket;
+				}
+				if (k === smiles.length-1 && smiles[k] != ']') {
+					alert("] is missing");
+					break smiles_traversal;
+				}
+				pos_end++
+			}
+			//Get the substring corresponding to this section
+			let atom_str = smiles.substring(i, pos_end + 1);
+			//Traversing the atom str leaving the opening bracket behind
+			let atom_i = 1;
+			//Get the isotope
+			let isotope_prop = get_isotope(atom_str, atom_i);
+			if (isotope_prop.is_isotope === 1) {
+				//Add the data
+				atom.is_isotope = 1;
+				atom.isotope = isotope_prop.isotope;
+				//Increase counter
+				atom_i = isotope_prop['position'];
+			} else {
+				atom.is_isotope = 0;
+				atom.isotope = "";
+			}
+			//Get atom symbol
+			atom_symbol = get_symbol_bracket(atom_str, atom_i);
+			if (typeof atom_symbol['msg'] === "undefined") {
+				atom_i = atom_symbol['position'];
+				atom_symbol = atom_symbol['symbol'];
+			} else {
+				alert(atom_symbol['msg']);
+				break smiles_traversal;
+			}
+			//Check atom symbol and delete H if needed
+			if(!atom_symbols.has(atom_symbol)) {
+				if (atom_symbol.slice(-1) === 'H') {
+					//Atom has explicit hydrogens, delete 'H' and decrease counter
+					atom_symbol = atom_symbol.slice(0, atom_symbol.length-1);
+					atom_i = atom_i-1;
+					//Check symbol again
+					if(!atom_symbols.has(atom_symbol)) {
+						alert('Unknown atom symbol: ' + '\r\n' + atom_symbol + '\r\n' + 'Please, make corrections or consider alternative input');
+						break smiles_traversal;
+					}
+				} else {
+					alert('Unknown atom symbol: ' + '\r\n' + atom_symbol + '\r\n' + 'Please, make corrections or consider alternative input');
+					break smiles_traversal;
+				}
+			}
+			//Add to the description of atom
+			atom.atom_symbol = atom_symbol;
+			//Check if aromatic
+			if (aromatics_set.has(atom_symbol)) {
+				is_aromatic = 1;
+			} else {
+				is_aromatic = 0;
+			}
+			//Get H-data
+			let h_data = get_h(atom_str, atom_i);
+			explH_count = get_h(atom_str, atom_i)['explH_count'];
+			//Add data on hydrogens
+			if (explH_count > 0) {
+				for (let k = 0; k < explH_count; k++) {
+					let atom_h = {"atom_id": atom_id + 0.1*(k+1), "atom_symbol": "H", "is_charged": 0, "charge": 0, "atom_start": atom_i, "atom_end": atom_i, "bonds": [{"from_id": atom_id + 0.1*(k+1), "from_pos": atom_start, "to_pos": atom_start, "type": '-'}] };
+					mol_raw.push(atom_h);
+				}
+			}
+			atom_i = h_data['position'];
+			//Get charge-data
+			charge_data = get_charge(atom_str, atom_i);
+			atom.is_charged = charge_data.is_charged;
+			atom.charge_qual = charge_data.charge_qual;
+			atom.charge_quant = charge_data.charge_quant;
+			atom_i = charge_data['position'];
+			//Check if it is over
+			if (atom_str[atom_i] != ']') {
+				alert('Problem while parsing: ' + '\r\n' + curr_section + '\r\n' + 'Please, make corrections or consider alternative input');
+				break smiles_traversal;
+			}
+			//Increase character counter
+			i = i + atom_i;
+			atom_end = i;
+			atom.atom_start = atom_start;
+			atom.atom_end = atom_end;
+		}
+		//Check if current position belongs to the organic atom and characterize it
+		if ( bracketed === 0 && organic_set.has(smiles[i]) ) {
+			console.log("Organic:  " + i);
+			organic = 1;
+			//Initialize the variables to store the characteristics of the atom
+			atom = {};
+			// Basic descriptors
+			explH = 0;
+			explH_count = 0;
+			is_charged = 0;
+			is_aromatic = 0;
+			charge_qual = "";
+			charge_quant = 0;
+			is_isotope = 0;
+			isotope = "";
+			atom_symbol = "";
+			atom_bonds = [];
+			// Store connections
+			let connected_positions = [];
+			//positions
+			atom_start = i;
+			atom_end = i;
+			//New atom
+			atom_id++;
+			atom.atom_id = atom_id;
+			atom.bonds = [];
+			//Get the substr corresponding to this section
+			let atom_str = smiles.substring(i, i + 1);
+			//Symbol
+			atom_symbol = atom_str;
+			if (aromatics_set.has(atom_symbol)) {
+				is_aromatic = 1;
+			} else {
+				is_aromatic = 0;
+			}
+			//Add the obvious
+			atom.is_isotope = is_isotope;
+			atom.atom_symbol = atom_symbol;
+			atom.is_aromatic = is_aromatic;
+			atom.is_charged = is_charged;
+			atom.charge_qual = charge_qual;
+			atom.charge_quant = charge_quant;
+			atom.atom_start = atom_start;
+			atom.atom_end = atom_end;
+		}
+		//Backward search with regards to the current atom
+		if (bracketed === 1 | organic === 1) {
+			let prebond_found = 0;
+			if (atom_start > 0) {
+				//Check for explicit bonds behind this atom
+				let prebond_data = pre_bond_get(i, atom_start, smiles, atom_bonds, bonds_set);
+				if (typeof prebond_data != "undefined") {
+					prebond_found = prebond_data['found'];
+					atom_start = prebond_data['atom_start'];
+				}
+				//Find the previous atom if ")"
+				let prev_closebranch_data = prev_atom_get_main(i, atom_start, smiles);
+				y = prev_closebranch_data;
+				//Add the rslts
+				if (prev_closebranch_data != "not_the_case") {
+					atom_start = prev_closebranch_data['atom_start'];
+					//Add the data on bond
+					if (prebond_found === 0) {
+						atom.bonds.push({"from_id": atom_id, "from_pos": atom_start, "to_pos": prev_closebranch_data['connected_position'], "type": '-'});
+					} else {
+						atom.bonds.push({"from_id": atom_id, "from_pos": atom_start, "to_pos": prev_closebranch_data['connected_position'], "type": prebond_data['bond']});
+					}
+				}
+				//Find the previous atom if "("
+				let prev_openbranch_data = prev_atom_get_frombranch(i, atom_start, smiles);
+				//Check and add
+				if (prev_openbranch_data != "not_the_case") {
+					atom_start = prev_openbranch_data['atom_start'];
+					//Add the data on bond
+					if (prebond_found === 0) {
+						atom.bonds.push({"from_id": atom_id, "from_pos": atom_start, "to_pos": prev_openbranch_data['connected_position'], "type": '-'});
+					} else {
+						atom.bonds.push({"from_id": atom_id, "from_pos": atom_start, "to_pos": prev_openbranch_data['connected_position'], "type": prebond_data['bond']});
+					}
+				}
+				//Find prev if "DIGIT"
+				let prev_digit_data = prev_atom_get_digit (atom_start, smiles);
+				//Check and add
+				if (prev_digit_data != "not_the_case") {
+					atom_start = prev_digit_data['atom_start'];
+					//Add the data on bond
+					if (prebond_found === 0) {
+						atom.bonds.push({"from_id": atom_id, "from_pos": atom_start, "to_pos": prev_digit_data['connected_position'], "type": '-'});
+					} else {
+						atom.bonds.push({"from_id": atom_id, "from_pos": atom_start, "to_pos": prev_digit_data['connected_position'], "type": prebond_data['bond']});
+					}
+				}
+				//Find prev if exactly atom
+				let prev_atom_data = prev_atom_get_atom(atom_start, smiles, connected_positions);
+				//Check and add
+				if (prev_atom_data != "not_the_case") {
+					atom_start = prev_atom_data['atom_start'];
+					//Add the data on bond
+					if (prebond_found === 0) {
+						atom.bonds.push({"from_id": atom_id, "from_pos": atom_start, "to_pos": prev_atom_data['connected_position'], "type": '-'});
+					} else {
+						atom.bonds.push({"from_id": atom_id, "from_pos": atom_start, "to_pos": prev_atom_data['connected_position'], "type": prebond_data['bond']});
+					}
+				}
+				atom.atom_start = atom_start;
+			}
+		}
+
+		//Forward search with regards to the bracketed atom.
+		//The main search is doing Backward, here is the extension mainly
+		//AND rings 
+		if (bracketed === 1 | organic === 1) {
+			if (atom_end < smiles.length-1) {
+				//')' - end of the branch, nothing interesting ahead, just extend the atom
+				if (smiles[i+1] == ')') {
+					i++
+					atom_end++
+				}
+				//Digit OR '%' -> ring start and the end of the ring should be found
+				if ( (/[0-9]/).test(smiles[atom_end+1]) | smiles[atom_end+1] === "%" ) {
+					//Get the substr describing belonging to rings
+					let ring_str = next_get_rings(i, atom_end, smiles);
+					i = ring_str['position'];
+					atom_end = ring_str['atom_end'];
+					let ring_start = ring_str['ring_start'];
+					ring_str = ring_str['ring_str'];
+					//Parse ring str into rings
+					let these_rings = parse_ring_str (ring_start, ring_str);
+					//If some or all rings are not closed yet, they should be closed
+					//Thus, check and close
+					for (let k = 0; k < these_rings.length; k++) {
+						let this_ring = these_rings[k];
+						//Check
+						ring_action = check_ring(this_ring, closed_rings);
+						//Do smth
+						if (ring_action === "this ring is closed") {
+							//Proceed with the next ring
+							continue;
+						} else {
+							//Find the end of this ring and establish the connection
+							let ring_end = end_ring(atom_end, this_ring, smiles);
+							//Reportfailure OR Add the data on connection and close the ring officially
+							if (ring_end.end_start < 0) {
+								alert('Unable to find the end of the ring: ' + '\r\n' + this_ring.str + '\r\n' + 'Please, make corrections or consider alternative input');
+								break smiles_traversal;
+							} else {
+								closed_rings = closed_rings.union(this_ring.pos);
+								atom.bonds.push({"from_id": atom_id, "from_pos": atom_start, "to_pos": ring_end.end_start, "type": '-'});
+								for (let k = ring_end.end_start; k <= ring_end.end_end; k++) {
+									closed_rings.add(k);
+								}
+							}
+						}
+					}
+					//Temporary solution, correct latter
+					i--
+					atom.atom_end = atom_end;
+				} else {
+					//Explicit bond followed by Digit OR '%' -> ring start and the end of the ring should be found
+					if ( bonds_set.has(smiles[atom_end+1]) && ((/[0-9]/).test(smiles[atom_end+2]) | smiles[atom_end+2] === "%") ) {
+						console.log("Correct atom end:   " + atom_end);
+						//Remember the bond
+						let ring_bond = smiles[atom_end+1];
+						atom_end++
+						i++
+						//Get the substr describing belonging to rings
+						let ring_str = next_get_rings(i, atom_end, smiles);
+						i = ring_str['position'];
+						atom_end = ring_str['atom_end'];
+						let ring_start = ring_str['ring_start'];
+						ring_str = ring_str['ring_str'];
+						//Parse ring str into rings
+						let these_rings = parse_ring_str (ring_start, ring_str);
+						//If some or all rings are not closed yet, they should be closed
+						//Thus, check and close
+						for (let k = 0; k < these_rings.length; k++) {
+							let this_ring = these_rings[k];
+							//Check
+							ring_action = check_ring(this_ring, closed_rings);
+							//Do smth
+							if (ring_action === "this ring is closed") {
+								//Proceed with the next ring
+								continue;
+							} else {
+								//Find the end of this ring and establish the connection
+								let ring_end = end_ring(atom_end, this_ring, smiles);
+								//Reportfailure OR Add the data on connection and close the ring officially
+								if (ring_end.end_start < 0) {
+									alert('Unable to find the end of the ring: ' + '\r\n' + this_ring.str + '\r\n' + 'Please, make corrections or consider alternative input');
+									break smiles_traversal;
+								} else {
+									closed_rings = closed_rings.union(this_ring.pos);
+									atom.bonds.push({"from_id": atom_id, "from_pos": atom_start, "to_pos": ring_end.end_start, "type": ring_bond});
+									for (let k = ring_end.end_start; k <= ring_end.end_end; k++) {
+										closed_rings.add(k);
+									}
+								}
+							}
+						}
+						//Temporary solution, correct latter
+						i--
+						atom.atom_end = atom_end;
+					}
+				}
+			}
+		}
+		mol_raw.push(atom);
+	}
+	//#red Preliminary version
+	mol_raw = mol_raw.filter(element => typeof element != 'undefined');
+	//Traverse atoms within mol along with the descriptions obtained and reconstruct the list of bonds as the checkable table
+	let bond_table = new Map();
+	let cool_bonds = new Set(['=', '#', '$', ':', '\\', '/'])
+	for (let i = 0; i < mol_raw.length; i++) {
+		//Atoms and their positions
+		let atom_id = mol_raw[i]['atom_id'];
+		let atom_symbol = mol_raw[i]['atom_symbol'];
+		//Traverse the bonds
+		atom_bonds = mol_raw[i]['bonds'];
+		for (let k = 0; k < atom_bonds.length; k++) {
+			let destination = atom_bonds[k]['to_pos'];
+			let type = atom_bonds[k]['type'];
+			//Find the corresponding atom
+			let n_dest_atoms = 0;
+			for (let j = 0; j < mol_raw.length; j++) {
+				//Treat H differently
+				if (mol_raw[j]['atom_symbol']!='H' && mol_raw[j]['atom_start'] <= destination && mol_raw[j]['atom_end'] >= destination ) {
+					let bond_id = [atom_id, mol_raw[j]['atom_id']]
+								   .sort()
+								   .join("-");
+					//Check if the bond is known
+					if (bond_table.has(bond_id)) {
+						//Compare bond types
+						let current_record = bond_table.get(bond_id);
+						if (!cool_bonds.has(current_record['type']) && cool_bonds.has(type)) {
+							bond_table.delete(bond_id);
+							bond_table.set(bond_id, {"start_id": bond_id.split('-')[0],
+												 "end_id": bond_id.split('-')[1],
+												 "start_symbol": mol_raw.find((element) => element['atom_id'] === parseFloat(bond_id.split('-')[0]))['atom_symbol'],
+												 "end_symbol": mol_raw.find((element) => element['atom_id'] === parseFloat(bond_id.split('-')[1]))['atom_symbol'],
+												 "type": type});
+						} 
+					} else {
+						//Add bond
+						bond_table.set(bond_id, {"start_id": bond_id.split('-')[0],
+												 "end_id": bond_id.split('-')[1],
+												 "start_symbol": mol_raw.find((element) => element['atom_id'] === parseFloat(bond_id.split('-')[0]))['atom_symbol'],
+												 "end_symbol": mol_raw.find((element) => element['atom_id'] === parseFloat(bond_id.split('-')[1]))['atom_symbol'],
+												 "type": type});
+					}
+				}
+			}
+		}
+	}
+	x = bond_table;
+	//Convert results into formated string to display
+	let result_str = "bond_id\tbond_type\tstart_id\tend_id\tstart_symbol\tend_symbol\n";
+	for (const [key, value] of bond_table) {
+		let row = key + "  \t  " + value['type'] + "  \t  " + value['start_id'] + "  \t  " + value['end_id'] + "  \t  " + value['start_symbol'] + "  \t  " + value['end_symbol'] + "\n";
+		result_str = result_str + row;
+	}
+	// * is OK
+	alert('Bonds detected in the SMILES: ' + '\n' + smiles + '\n' + result_str);
+	return;
+
+}
+
+//Buttons
+const btn_close_about = document.querySelector("#btn_close_about");
+const btn_close_interp = document.querySelector("#btn_close_interp");
+const btn_close_contact = document.querySelector("#btn_close_contact");
+const btn_send_txt = document.querySelector("#mi_btn");
+//Buttons & events
+btn_close_about.addEventListener("click", close_dlg, false);
+btn_close_interp.addEventListener("click", close_dlg, false);
+btn_close_contact.addEventListener("click", close_dlg, false);
+btn_send_txt.addEventListener("click", send_txt, false);
+</script>
+
+<style type="text/css">
+* {
+  box-sizing: inherit;
+}
+html {
+  height: 100%;
+  box-sizing: border-box;
+  background: #cecece;
+}
+body {
+	min-height: 99%;
+  height: 99%;
+  font: 1.2em roboto;
+  background: #ecf0f1;
+  display: grid;
+  grid-template-rows: 1fr;
+}
+dialog::backdrop {
+	backdrop-filter: blur(3px) brightness(60%) sepia(10%) !important;
+}
+nav {
+	 min-height: 20px;
+	 grid-column: 1/4;
+	 grid-row: 1;
+}
+main {
+	min-height: 100%;
+	grid-column: 2;
+	grid-row: 2;
+}
+textarea {
+	min-width: 100%;
+	min-height: 100%;
+}
+footer {
+	min-height: 20px;
+  background: linear-gradient(#ecf0f1, #bdc3c7);
+  color: black;
+  grid-column: 1/4;
+	grid-row: 3;
+}
+/* SEE: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/nav */
+nav ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+nav ul li {
+  float: right;
+}
+nav ul li a {
+  display: block;
+  color: black;
+  text-align: center;
+  padding: 14px 20px;
+  text-decoration: none;
+}
+
+nav ul li a:hover {
+  background-color: #ecf0f1;
+}
+.wrapper {
+	grid-row: 1;
+  min-height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 8fr 1fr;
+  grid-template-rows: 1fr 8fr 1fr;
+}
+.menu {
+  background: linear-gradient(#bdc3c7, #ecf0f1);
+  border-color: #bdc3c7 transparent #ecf0f1 transparent;
+  color: black;
+  padding: 5px;
+}
+.dlg_on {
+	min-height: 50vh;
+	min-width: 70%;
+	display: grid;
+	grid-template-columns: 1fr;
+	grid-template-rows: 1fr 8fr 1fr;
+}
+.dlg_off {
+	display: none;
+}
+.dlg_header {
+	min-height: 80px;
+}
+.dlg_div {
+	min-height: 100%;
+}
+.dlg_btn {
+	min-height: 30px;
+}
+#main_container{
+	height: 100%;
+	width: 100%;
+	min-height: 100%;
+	min-width: 100%;
+	display: grid;
+	grid-template-columns: 1fr;
+	grid-template-rows: 1fr 1fr 0.25fr 10fr 0.25fr 1fr 1fr;
+}
+#spacer_1 {
+  grid-row: 1;
+  min-height: 5px;
+}
+#mi_label_container {
+  grid-row: 2;
+  min-height: 5vh;
+}
+#spacer_2 {
+  grid-row: 3;
+  min-height: 12.5px;
+}
+#mi_container {
+	min-height: 100%;
+	min-width: 100%;
+  grid-row: 4;
+}
+#spacer_3 {
+  grid-row: 5;
+  min-height: 2.5px;
+}
+#mi_btn_container {
+  grid-row: 6;
+  min-height: 12.5px;
+}
+#spacer_3 {
+  grid-row: 7;
+  min-height: 5px;
+}
+#footer_txt {
+	text-align: center;
+}
+</style>
