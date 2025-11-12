@@ -385,24 +385,23 @@ function validate_smiles_input (smiles_input) {
 
 // 2 Check input smiles for components
 function select_component (input_smiles) {
-	let smiles;
 	let point_dlm;
 	point_dlm = input_smiles.indexOf('.');
 	if (point_dlm > -1) {
 		let smiles_array = input_smiles.split('.');
-		smiles = smiles_array.reduce( function (a, b) { return a.length > b.length ? a : b; } ).trim();
+		input_smiles = smiles_array.reduce( function (a, b) { return a.length > b.length ? a : b; } ).trim();
 	}
 	// Check the length
-	if (smiles.length > 500) {
+	if (input_smiles.length > 500) {
 		return("smth_wrong");
 		alert("Input string is too long");
 	}
-	if (smiles.length < 3) {
+	if (input_smiles.length < 3) {
 		alert("Input string is too short");
 		return("smth_wrong");
 	}
 	// Return the SMILES string
-	return(smiles);
+	return(input_smiles);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -975,7 +974,7 @@ function structure_to_mol (mol_structure) {
 		let atom_line;
 		// Populate this atom's line in atom block
 		// The format is xxxxx.xxxxyyyyy.yyyyzzzzz.zzzz aaaddcccssshhhbbbvvvHHHrrriiimmmnnneee
-		let atom_coords = "    0.   0    0.   0    0.   0 ";
+		let atom_coords = "    0.0  00   0.0  0    0.0  0 ";
 		let atom_symbol = mol_structure['atoms'][i]['atom_symbol'];
 		// convert the atom symbol, IF aromatic
 		if (aromatics_set.has(atom_symbol)) {
