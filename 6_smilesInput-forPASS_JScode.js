@@ -1,3 +1,7 @@
+// 13-11-2025, example of the problematic SMILES:
+// Cc1cc(-c2ccc(/N=N/c3ccc4c(S(=O)(=O)O)cc(S(=O)(=O)O)c(N)c4c3O)c(C)c2)ccc1/N=N/c1ccc2c(S(=O)(=O)O)cc(S(=O)(=O)O)c(N)c2c1O
+// The problem is that the aromatic bond between the two aromatic systems
+// Aromaticity should be taken more seriously
 ////////////////////////////////////////////////////////////////////////////////
 // Data     																///
 //////////////////////////////////////////////////////////////////////////////
@@ -34,7 +38,7 @@ bonds_map.set("/", [1]);
 //////////////////////////////////////////////////////////////////////////////
 
 
-// 1	Remove stereo, since PASS does not consider it
+// 1	Remove stereo and associated hydrogens, since PASS does not consider it
 function clear_stereo (smiles) {
 	smiles = smiles.replaceAll("@TB20", "");
 	smiles = smiles.replaceAll("@OH30", "");
@@ -51,6 +55,14 @@ function clear_stereo (smiles) {
 	smiles = smiles.replaceAll("@SP3", "");
 	smiles = smiles.replaceAll("@@", "");
 	smiles = smiles.replaceAll("@", "");
+	smiles = smiles.replaceAll("[CH]", "C");
+	smiles = smiles.replaceAll("[=CH]", "=C");
+	smiles = smiles.replaceAll("[#CH]", "#C");
+	smiles = smiles.replaceAll("[$CH]", "$C");
+	smiles = smiles.replaceAll("[:CH]", ":C");
+	smiles = smiles.replaceAll("[\\CH]", "\\C");
+	smiles = smiles.replaceAll("[/CH]", "/C");
+	smiles = smiles.replaceAll("[cH]", "c");
 	return(smiles);
 }
 
@@ -159,21 +171,14 @@ function prev_atom_get_main (position, atom_start, smiles) {
 	if (smiles[atom_start-1] === ")") {
 		let open_branch = 1;
 		for (let k = atom_start-2; k >= 0; k--) {
-			//Count '(' / ')'
+			//Count '(' and ')'
 			if (smiles[k] === ')') {
 				open_branch++;
 			}
 			if (smiles[k] === '(') {
 				open_branch--;
 			}
-			k--
-			if (smiles[k] === ')') {
-				open_branch++;
-			}
-			if (smiles[k] === '(') {
-				open_branch--;
-			}
-			if (open_branch === 0) {
+			if (open_branch === 0 && smiles[k-1] != ')') {
 				connected_position = k-1;
 				break;
 			}
@@ -189,6 +194,7 @@ function prev_atom_get_main (position, atom_start, smiles) {
 
 // 8 Get the connected atom on the left if this atom is the start of the branch
 function prev_atom_get_frombranch (position, atom_start, smiles) {
+	console.log("FROM BRANCH");
 	// Position is the current position in the whole SMILES string
 	let connected_position = -1;
 	if ( smiles[atom_start-1] === "(" ) {
@@ -219,14 +225,7 @@ function prev_atom_get_frombranch (position, atom_start, smiles) {
 				if (smiles[k] === '(') {
 					open_branch--;
 				}
-				k--
-				if (smiles[k] === ')') {
-					open_branch++;
-				}
-				if (smiles[k] === '(') {
-					open_branch--;
-				}
-				if (open_branch === 0) {
+				if (open_branch === 0 && smiles[k-1] != ')') {
 					connected_position = k-1;
 					break;
 				}
@@ -566,9 +565,10 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 			atom.atom_end = atom_end;
 		}
 		//Check if current position belongs to the organic atom and characterize it
-		if ( bracketed === 0 && organic_set.has(smiles[i]) ) {
+		if ( bracketed === 0 && (organic_set.has(smiles[i]) | organic_set.has(smiles[i] + smiles[i+1])) ) {
 			//console.log("Organic:  " + i);
 			organic = 1;
+			let atom_str;
 			//Initialize the variables to store the characteristics of the atom
 			atom = {};
 			// Basic descriptors
@@ -586,13 +586,20 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 			let connected_positions = [];
 			//positions
 			atom_start = i;
-			atom_end = i;
+			if ( organic_set.has(smiles[i] + smiles[i+1]) ) {
+				console.log(smiles[i] + smiles[i+1]);
+				atom_end = i + 1;
+				//Get the substr corresponding to this section
+				atom_str = smiles.substring(i, i + 2);
+			} else {
+				atom_end = i;
+				//Get the substr corresponding to this section
+				atom_str = smiles.substring(i, i + 1);
+			}
 			//New atom
 			atom_id++;
 			atom.atom_id = atom_id;
 			atom.bonds = [];
-			//Get the substr corresponding to this section
-			let atom_str = smiles.substring(i, i + 1);
 			//Symbol
 			atom_symbol = atom_str;
 			if (aromatics_set.has(atom_symbol)) {
