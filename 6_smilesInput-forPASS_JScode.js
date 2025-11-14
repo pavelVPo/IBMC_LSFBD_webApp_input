@@ -1,7 +1,11 @@
-// 13-11-2025, example of the problematic SMILES:
+// 13-11-2025, example of problematic SMILES:
 // Cc1cc(-c2ccc(/N=N/c3ccc4c(S(=O)(=O)O)cc(S(=O)(=O)O)c(N)c4c3O)c(C)c2)ccc1/N=N/c1ccc2c(S(=O)(=O)O)cc(S(=O)(=O)O)c(N)c2c1O
 // The problem is that the aromatic bond between the two aromatic systems
-// Aromaticity should be taken more seriously
+// Aromaticity should taken more seriously
+
+// COc1cc2c([nH]cn2)cc1
+// The problem is with [nH], probably
+//
 ////////////////////////////////////////////////////////////////////////////////
 // Data     																///
 //////////////////////////////////////////////////////////////////////////////
@@ -55,6 +59,16 @@ function clear_stereo (smiles) {
 	smiles = smiles.replaceAll("@SP3", "");
 	smiles = smiles.replaceAll("@@", "");
 	smiles = smiles.replaceAll("@", "");
+	smiles = smiles.replaceAll("[B]", "B");
+	smiles = smiles.replaceAll("[C]", "C");
+	smiles = smiles.replaceAll("[N]", "N");
+	smiles = smiles.replaceAll("[O]", "O");
+	smiles = smiles.replaceAll("[P]", "P");
+	smiles = smiles.replaceAll("[S]", "S");
+	smiles = smiles.replaceAll("[F]", "F");
+	smiles = smiles.replaceAll("[Cl]", "Cl");
+	smiles = smiles.replaceAll("[Br]", "Br");
+	smiles = smiles.replaceAll("[I]", "I");
 	smiles = smiles.replaceAll("[CH]", "C");
 	smiles = smiles.replaceAll("[=CH]", "=C");
 	smiles = smiles.replaceAll("[#CH]", "#C");
@@ -63,6 +77,7 @@ function clear_stereo (smiles) {
 	smiles = smiles.replaceAll("[\\CH]", "\\C");
 	smiles = smiles.replaceAll("[/CH]", "/C");
 	smiles = smiles.replaceAll("[cH]", "c");
+	smiles = smiles.replaceAll("[:cH]", "c");
 	return(smiles);
 }
 
@@ -489,6 +504,7 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 			}
 			//Get the substring corresponding to this section
 			let atom_str = smiles.substring(i, pos_end + 1);
+			console.log(atom_str);
 			//Traversing the atom str leaving the opening bracket behind
 			let atom_i = 1;
 			//Get the isotope
@@ -512,12 +528,14 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 				alert(atom_symbol['msg']);
 				break smiles_traversal;
 			}
+			console.log(atom_symbol);
 			//Check atom symbol and delete H if needed
 			if(!atom_symbols.has(atom_symbol)) {
 				if (atom_symbol.slice(-1) === 'H') {
 					//Atom has explicit hydrogens, delete 'H' and decrease counter
 					atom_symbol = atom_symbol.slice(0, atom_symbol.length-1);
 					atom_i = atom_i-1;
+					console.log(atom_symbol);
 					//Check symbol again
 					if(!atom_symbols.has(atom_symbol)) {
 						alert('Unknown atom symbol: ' + '\r\n' + atom_symbol + '\r\n' + 'Please, make corrections or consider alternative input');
@@ -536,16 +554,10 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 			} else {
 				is_aromatic = 0;
 			}
+			atom.is_aromatic = is_aromatic;
 			//Get H-data
 			let h_data = get_h(atom_str, atom_i);
 			explH_count = get_h(atom_str, atom_i)['explH_count'];
-			//Add data on hydrogens
-			if (explH_count > 0) {
-				for (let k = 0; k < explH_count; k++) {
-					let atom_h = {"atom_id": atom_id + 0.1*(k+1), "atom_symbol": "H", "is_charged": 0, "charge": 0, "atom_start": atom_i, "atom_end": atom_i, "bonds": [{"from_id": atom_id + 0.1*(k+1), "from_pos": atom_start, "to_pos": h_data['position']-1, "type": '-'}] };
-					mol_structure_raw.push(atom_h);
-				}
-			}
 			atom_i = h_data['position'];
 			//Get charge-data
 			charge_data = get_charge(atom_str, atom_i);
@@ -553,6 +565,8 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 			atom.charge_qual = charge_data.charge_qual;
 			atom.charge_quant = charge_data.charge_quant;
 			atom_i = charge_data['position'];
+			console.log(charge_data);
+			console.log(i+atom_i);
 			//Check if it is over
 			if (atom_str[atom_i] != ']') {
 				alert('Problem while parsing: ' + '\r\n' + curr_section + '\r\n' + 'Please, make corrections or consider alternative input');
@@ -563,6 +577,15 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 			atom_end = i;
 			atom.atom_start = atom_start;
 			atom.atom_end = atom_end;
+			//Add data on hydrogens
+			atom_id++
+			if (explH_count > 0) {
+				for (let k = 0; k < explH_count; k++) {
+					atom_id++
+					let atom_h = {"atom_id": atom_id, "atom_symbol": "H", "is_charged": 0, "is_aromatic": 0, "charge_quant": 0, "charge_qual": "", "atom_start": i - atom_i + h_data['position'], "atom_end": i - atom_i + h_data['position'], "bonds": [{"from_id": atom_id, "from_pos": atom_start, "to_pos": i - atom_i + h_data['position'] - 1, "type": '-'}] };
+					mol_structure_raw.push(atom_h);
+				}
+			}
 		}
 		//Check if current position belongs to the organic atom and characterize it
 		if ( bracketed === 0 && (organic_set.has(smiles[i]) | organic_set.has(smiles[i] + smiles[i+1])) ) {
@@ -819,16 +842,16 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 							bond_table.delete(bond_id);
 							bond_table.set(bond_id, {"start_id": bond_id.split('-')[0],
 												 "end_id": bond_id.split('-')[1],
-												 "start_symbol": structure_in_progress.find((element) => element['atom_id'] === parseFloat(bond_id.split('-')[0]))['atom_symbol'],
-												 "end_symbol": structure_in_progress.find((element) => element['atom_id'] === parseFloat(bond_id.split('-')[1]))['atom_symbol'],
+												 "start_symbol": structure_in_progress.find((element) => element['atom_id'] === parseInt(bond_id.split('-')[0]))['atom_symbol'],
+												 "end_symbol": structure_in_progress.find((element) => element['atom_id'] === parseInt(bond_id.split('-')[1]))['atom_symbol'],
 												 "type": type});
 						} 
 					} else {
 						//Add bond
 						bond_table.set(bond_id, {"start_id": bond_id.split('-')[0],
 												 "end_id": bond_id.split('-')[1],
-												 "start_symbol": structure_in_progress.find((element) => element['atom_id'] === parseFloat(bond_id.split('-')[0]))['atom_symbol'],
-												 "end_symbol": structure_in_progress.find((element) => element['atom_id'] === parseFloat(bond_id.split('-')[1]))['atom_symbol'],
+												 "start_symbol": structure_in_progress.find((element) => element['atom_id'] === parseInt(bond_id.split('-')[0]))['atom_symbol'],
+												 "end_symbol": structure_in_progress.find((element) => element['atom_id'] === parseInt(bond_id.split('-')[1]))['atom_symbol'],
 												 "type": type});
 					}
 				}
@@ -848,6 +871,7 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 		let elem_charged = structure_in_progress[i]['is_charged'];
 		let elem_isotope = structure_in_progress[i]['is_isotope'];
 		let elem_charge_quant = structure_in_progress[i]['charge_quant'];
+		let elem_charge_qual = structure_in_progress[i]['charge_qual'];
 		if (typeof elem_charge_quant === "undefined") {
 			elem_charge_quant = 0;
 		}
@@ -868,6 +892,7 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 		structure_elem['is_charged'] = elem_charged;
 		structure_elem['is_isotope'] = elem_isotope;
 		structure_elem['charge_quant'] = elem_charge_quant;
+		structure_elem['charge_qual'] = elem_charge_qual;
 		structure_elem['bonds'] = elem_bonds;
 		// Add this element to the structure
 		mol_atoms.push(structure_elem);
@@ -904,6 +929,18 @@ function reconstruct_aromatics (mol_structure) {
 		}
 	}
 	return mol_structure;
+}
+
+// 5. Convert to kekule form
+// This function will be based on the similar from RDKit, since:
+// 1. It is thorougly tested
+// 2. Consistency in processing of chemical data is important for the (Q)SAR modeling
+// SEE: https://github.com/rdkit/rdkit/blob/master/Code/GraphMol/Kekulize.cpp
+// So, aromatic systems are flat rings (traditional or fused), where number of p-electrons equal to 4n+2, where n != 1
+// 1. Find aromatic system (ring with aromatic atoms)
+// 2. Select positions where double bonds could be inserted and insert double bonds instead of aromatic ones, other bonds -> single bonds
+function deconstruct_aromatics (mol_structure) {
+	
 }
 
 // Export structure to MOL just for PASS, coordinates will not be computed
@@ -969,12 +1006,13 @@ function structure_to_mol (mol_structure) {
 	// Link atom
 	// ...
 	// M END -> end of block
+	let n_of_charged = 0;
+	let charge_line = "";
 	const prop_block = [];
 	// So, to construct MOL it is needed to go through the structure describe and count atom and bonds
 	// Filling the atom_block, bond_block and prop_block
 	// Since bonds are between the pairs of atoms, it is necessary to monitor them
 	described_bonds = new Set();
-	console.log(described_bonds);
 	for (let i = 0; i < mol_structure['atoms'].length; i++) {
 		// Construct MOL
 		// Construct this atom's line
@@ -1027,6 +1065,7 @@ function structure_to_mol (mol_structure) {
 				let bond_line;
 				// Populate this atom's line in bond block
 				// The format is 111222tttsssxxxrrrccc
+				// Consider hydrogens
 				let atom_one_number = mol_structure['atoms'].findIndex((element) => element['atom_id'] === parseInt(bond_i_key.split("-")[0])) + 1;
 				let atom_two_number = mol_structure['atoms'].findIndex((element) => element['atom_id'] === parseInt(bond_i_key.split("-")[1])) + 1;
 				atom_one_number = [zero_trail, atom_one_number].join("").slice(-3);
@@ -1070,19 +1109,24 @@ function structure_to_mol (mol_structure) {
 		// So, if atom is charged -> add the property line, LIKE:
 		// M__CHG  1____8__-1: prefix, number of entries on the line, charge [-15, +15]
 		// #red add the check-up for charge belonging to [15, 15]
-		let atom_charge_q = mol_structure['atoms'][i]['charge_quant'];
-		let atom_number_here = ["    ", i.toString()].join("").slice(-4);
-		if (atom_charge_q != 0 ) {
+		let atom_charge_q = mol_structure['atoms'][i]['charge_qual'] + mol_structure['atoms'][i]['charge_quant'].toString();
+		let atom_number_here = ["    ", (i+1).toString()].join("").slice(-4);
+		if (atom_charge_q != "0" ) {
+			n_of_charged++
 			// Stringify the charge value
-			atom_charge_q = ["    ", atom_charge_q.toString()].join("").slice(-4);
+			atom_charge_q = ["    ", atom_charge_q].join("").slice(-4);
 			// Construct property line
-			const prop_line = "M  CHG  1" + atom_number_here + atom_charge_q;
-			prop_block.push(prop_line);
+			charge_line = charge_line + atom_number_here + atom_charge_q;
 		} 
 
 	}
+	charge_line = "M  CHG" + ["    ", n_of_charged.toString()].join("").slice(-3) + charge_line;
+	if (n_of_charged > 0) {
+		prop_block.push(charge_line);
+		prop_block.push("\r\n");
+	}
 	bond_block = [... new Set(bond_block)];
 	// Construct MOL string
-	let mol_string = header_block + "\r\n" + counts_line + "\r\n" + atom_block.join("\r\n") + "\r\n" + bond_block.join("\r\n") + "\r\n" + "M  END\r\n";
+	let mol_string = header_block + "\r\n" + counts_line + "\r\n" + atom_block.join("\r\n") + "\r\n" + bond_block.join("\r\n") + "\r\n"+ prop_block.join("") + "M  END\r\n";
 	return mol_string;
 }
