@@ -1,11 +1,6 @@
-// 13-11-2025, example of problematic SMILES:
-// Cc1cc(-c2ccc(/N=N/c3ccc4c(S(=O)(=O)O)cc(S(=O)(=O)O)c(N)c4c3O)c(C)c2)ccc1/N=N/c1ccc2c(S(=O)(=O)O)cc(S(=O)(=O)O)c(N)c2c1O
-// The problem is that the aromatic bond between the two aromatic systems
-// Aromaticity should taken more seriously
-
-// COc1cc2c([nH]cn2)cc1
-// The problem is with [nH], probably
-//
+// 16-11-2025, the problem with the percieving of aromaticity has been solved,
+// testing is requaired:
+// Cn1cc(-c2cc3c(N4CCN(c5ncc([C@@](C)(N)c6ccc(F)cc6)cn5)CC4)ncnn3c2)cn1
 ////////////////////////////////////////////////////////////////////////////////
 // Data     																///
 //////////////////////////////////////////////////////////////////////////////
@@ -209,7 +204,6 @@ function prev_atom_get_main (position, atom_start, smiles) {
 
 // 8 Get the connected atom on the left if this atom is the start of the branch
 function prev_atom_get_frombranch (position, atom_start, smiles) {
-	console.log("FROM BRANCH");
 	// Position is the current position in the whole SMILES string
 	let connected_position = -1;
 	if ( smiles[atom_start-1] === "(" ) {
@@ -346,6 +340,56 @@ function end_ring (atom_end, this_ring, smiles) {
 	}
 }
 
+// 15 Get the starting position of the atom starting the ring given the position of the first numeric or % describing the ring
+// for aromatics only
+function extend_start (ring_pseudo_start, smiles) {
+	let ring_start = ring_pseudo_start;
+	// Just decrease the counter until the aromatic atom is found
+	for (let i = ring_pseudo_start; i > 0; i--) {
+		if ( aromatics_set.has(smiles[i-1] + smiles[i-2]) ) {
+			ring_start = i-2;
+			return ring_start;
+		} else {
+			if ( aromatics_set.has(smiles[i-1]) ) {
+				ring_start = i-1;
+				return ring_start;
+			}
+		}
+	}
+	alert("Smth is wrong");
+	return ring_pseudo_start;
+}
+
+// 16 Get all the rings from SMILES
+function get_all_aromatic_rings (smiles) {
+	// Initialize some variables
+	const closed_rings = new Set();
+	let rings = [];
+	let position = 0;
+	// Traverse the smiles detecting rings' borders
+	const ring_marks = parse_ring_str(0, smiles);
+	// Collect the corresponding borders to records
+	for (let i = 0; i < ring_marks.length; i++) {
+		const ring_id = ring_marks[i]['str'];
+		let ring_start = [...ring_marks[i]['pos']].toSorted()[0];
+		ring_start = extend_start(ring_start, smiles);
+		const ring_start_fin = [...ring_marks[i]['pos']].toSorted()[[...ring_marks[i]['pos']].length-1];
+		// Find the end of this ring if it is not ended still
+		if (!closed_rings.has(ring_id)) {
+			for (let k = 0; k < ring_marks.length; k++) {
+				const ring_id_end = ring_marks[k]['str'];
+				const ring_end = [...ring_marks[k]['pos']].toSorted()[[...ring_marks[k]['pos']].length-1];
+				// Pair it
+				if (ring_id === ring_id_end && i != k && ring_start < ring_end) {
+					let this_ring = {"id": i.toString() + "_" + ring_id, "start": ring_start, "end": ring_end}
+					rings.push(this_ring);
+				}
+			}
+		}
+	}
+	return rings;
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Functions to do the basic check-up										///
@@ -464,7 +508,6 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 		let connected_positions;
 		//Check if current position belongs to the bracketed atom and characterize it
 		if ( smiles[i] === '[') {
-			//console.log("Atom:  " + i);
 			bracketed = 1;
 			//Initialize the variables to store the characteristics of the atom
 			atom = {};
@@ -504,7 +547,6 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 			}
 			//Get the substring corresponding to this section
 			let atom_str = smiles.substring(i, pos_end + 1);
-			console.log(atom_str);
 			//Traversing the atom str leaving the opening bracket behind
 			let atom_i = 1;
 			//Get the isotope
@@ -528,14 +570,12 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 				alert(atom_symbol['msg']);
 				break smiles_traversal;
 			}
-			console.log(atom_symbol);
 			//Check atom symbol and delete H if needed
 			if(!atom_symbols.has(atom_symbol)) {
 				if (atom_symbol.slice(-1) === 'H') {
 					//Atom has explicit hydrogens, delete 'H' and decrease counter
 					atom_symbol = atom_symbol.slice(0, atom_symbol.length-1);
 					atom_i = atom_i-1;
-					console.log(atom_symbol);
 					//Check symbol again
 					if(!atom_symbols.has(atom_symbol)) {
 						alert('Unknown atom symbol: ' + '\r\n' + atom_symbol + '\r\n' + 'Please, make corrections or consider alternative input');
@@ -565,8 +605,6 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 			atom.charge_qual = charge_data.charge_qual;
 			atom.charge_quant = charge_data.charge_quant;
 			atom_i = charge_data['position'];
-			console.log(charge_data);
-			console.log(i+atom_i);
 			//Check if it is over
 			if (atom_str[atom_i] != ']') {
 				alert('Problem while parsing: ' + '\r\n' + curr_section + '\r\n' + 'Please, make corrections or consider alternative input');
@@ -589,7 +627,6 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 		}
 		//Check if current position belongs to the organic atom and characterize it
 		if ( bracketed === 0 && (organic_set.has(smiles[i]) | organic_set.has(smiles[i] + smiles[i+1])) ) {
-			//console.log("Organic:  " + i);
 			organic = 1;
 			let atom_str;
 			//Initialize the variables to store the characteristics of the atom
@@ -610,7 +647,6 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 			//positions
 			atom_start = i;
 			if ( organic_set.has(smiles[i] + smiles[i+1]) ) {
-				console.log(smiles[i] + smiles[i+1]);
 				atom_end = i + 1;
 				//Get the substr corresponding to this section
 				atom_str = smiles.substring(i, i + 2);
@@ -721,7 +757,7 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 					let ring_start = ring_str['ring_start'];
 					ring_str = ring_str['ring_str'];
 					//Parse ring str into rings
-					let these_rings = parse_ring_str (ring_start, ring_str);
+					let these_rings = parse_ring_str(ring_start, ring_str);
 					//If some or all rings are not closed yet, they should be closed
 					//Thus, check and close
 					for (let k = 0; k < these_rings.length; k++) {
@@ -740,7 +776,6 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 								alert('Unable to find the end of the ring: ' + '\r\n' + this_ring.str + '\r\n' + 'Please, make corrections or consider alternative input');
 								break smiles_traversal;
 							} else {
-								//console.log(atom);
 								closed_rings = closed_rings.union(this_ring.pos);
 								//Check if the number marking the end of this ring is preceeded by the explicit bond
 								if (bonds_set.has(smiles[ring_end.end_start-1])) {
@@ -750,7 +785,6 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 								}
 								for (let k = ring_end.end_start; k <= ring_end.end_end; k++) {
 									closed_rings.add(k);
-								//console.log(atom);
 								}
 							}
 						}
@@ -761,7 +795,6 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 				} else {
 					//Explicit bond followed by Digit OR '%' -> ring start and the end of the ring should be found
 					if ( bonds_set.has(smiles[atom_end+1]) && ((/[0-9]/).test(smiles[atom_end+2]) | smiles[atom_end+2] === "%") ) {
-						//console.log("Correct atom end:   " + atom_end);
 						//Remember the bond
 						let ring_bond = smiles[atom_end+1];
 						atom_end++
@@ -807,7 +840,6 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 				}
 			}
 		}
-		//console.log(atom);
 		mol_structure_raw.push(atom);
 	}
 	// Finalize structure
@@ -902,7 +934,7 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 	return(mol_structure);
 }
 
-// 3. Check number of Carbons
+// 3. Check the number of Carbons
 function check_3c (mol_structure) {
 	let condition_3c = 3;
 	for (let i = 0; i < mol_structure['atoms'].length; i++) {
@@ -916,31 +948,98 @@ function check_3c (mol_structure) {
 	return false;
 }
 
-// 4. Reconstruct aromatic bonds
-function reconstruct_aromatics (mol_structure) {
-	for (let [key, value] of mol_structure['bonds']) {
-		let aromatic_status = value;
-		if (aromatics_set.has(value['start_symbol']) && aromatics_set.has(value['end_symbol'])) {
-			aromatic_status['aromatic'] = 1;
-			mol_structure['bonds'].set(key, aromatic_status);
+// 4. Reconstruct rings, it could be done and probably should be done, during the initial SMILES parsing, but since
+// performance is not the main concern at the moment
+// function to parse SMILES is quite big and will be reworked latter
+// let it be the distinct function
+/*function reconstruct_aromatics_test (mol_structure, all_rings, smiles) {
+	// Count aromatic rings
+	ring_number = 0;
+	// Atom in rings should have at least two bonds and be aromatic
+	for (let value of mol_structure['atoms']) {
+		if ( aromatics_set.has(value['atom_symbol']) && value['bonds'].size > 1 ) {
+			// The main code goes here
+			// Find the ring for this atom:
+			// - this atom could be the start OR the end of this ring
+
 		} else {
-			aromatic_status['aromatic'] = 0;
-			mol_structure['bonds'].set(key, aromatic_status);
+			if ( aromatics_set.has(value['atom_symbol']) && value['bonds'].size < 2 ) { 
+				return("smth_wrong");
+				alert("Aromatic atoms not in rings are not allowed");	
+			}
 		}
 	}
-	return mol_structure;
-}
+}*/
 
-// 5. Convert to kekule form
-// This function will be based on the similar from RDKit, since:
-// 1. It is thorougly tested
-// 2. Consistency in processing of chemical data is important for the (Q)SAR modeling
-// SEE: https://github.com/rdkit/rdkit/blob/master/Code/GraphMol/Kekulize.cpp
-// So, aromatic systems are flat rings (traditional or fused), where number of p-electrons equal to 4n+2, where n != 1
-// 1. Find aromatic system (ring with aromatic atoms)
-// 2. Select positions where double bonds could be inserted and insert double bonds instead of aromatic ones, other bonds -> single bonds
-function deconstruct_aromatics (mol_structure) {
-	
+// 5. Reconstruct aromatic bonds and mark those, which are in rings and not between them
+// Bond is in ring if
+// its atoms belong to single ring
+// its atoms belong to two rings
+function reconstruct_aromatics (mol_structure) {
+	const aromatic_adjlist = new Map();
+	for (let i = 0; i < mol_structure['atoms'].length; i++) {
+		const this_atom_pairs = new Set();
+		if ( aromatics_set.has(mol_structure['atoms'][i]['atom_symbol']) ) {
+			for (let value of mol_structure['atoms'][i]['bonds']) {
+				let this_pair = parseInt(value.split("-").filter((element) => parseInt(element) != mol_structure['atoms'][i]['atom_id']));
+				// Filter to get corrsponding array element and atom symbol from it
+				let this_pair_symbol = mol_structure['atoms'].filter( (element) => element['atom_id'] === this_pair )[0]['atom_symbol'];
+				if (aromatics_set.has(this_pair_symbol)) {
+					this_atom_pairs.add(this_pair);
+				}
+			}
+			if (mol_structure['atoms'][i]['atom_id'] === 2) {
+			}
+			aromatic_adjlist.set(mol_structure['atoms'][i]['atom_id'], this_atom_pairs);
+		}
+	}
+	x = aromatic_adjlist;
+	for (let [key, value] of mol_structure['bonds']) {
+		let aromatic_status = value;
+		// Make all bonds non-aromatic 
+		aromatic_status['aromatic'] = 0;
+		mol_structure['bonds'].set(key, aromatic_status);
+		if (aromatics_set.has(value['start_symbol']) && aromatics_set.has(value['end_symbol'])) {
+			// Check if this bond is in aromatic ring, i.e. without this bond its atoms are still connected via aromatics
+			// Breadth-first search ignoring the immediate connection to the target node (atom)
+			let queue = [];
+			const observed_atoms = new Set();
+			// Initialize search ignoring the target atom
+			queue.push(parseInt(value['start_id']));
+			observed_atoms.add(parseInt(value['start_id']));
+			// Actual Breadth-first search
+			let preventive_counter = 0;
+			do {
+				preventive_counter++;
+				console.log("search:");
+				console.log(value['start_id']);
+				console.log(value['end_id']);
+				console.log(queue);
+				let current_start = queue.shift();
+				console.log(current_start);
+				// Check if this the target atom
+				if (current_start === parseInt(value['end_id'])) {
+					aromatic_status['aromatic'] = 1;
+					mol_structure['bonds'].set(key, aromatic_status);
+					break;
+				}
+				// Proceed
+				// Copying from the Set is a big deal
+				let adj_toSearch = new Set([...aromatic_adjlist.get(current_start)]);
+				// Delete the target atom on the first step
+				if (preventive_counter === 1) {
+					adj_toSearch.delete(parseInt(value['end_id']));
+				}
+				for (let setval of adj_toSearch) {
+					if (!observed_atoms.has(setval)) {
+						queue.push(setval);
+						observed_atoms.add(setval);
+					}
+				}
+			} while (queue.length > 0);
+		} 
+	}
+	return mol_structure;
 }
 
 // Export structure to MOL just for PASS, coordinates will not be computed
