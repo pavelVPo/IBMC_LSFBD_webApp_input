@@ -110,6 +110,7 @@ function send_txt() {
 	console.log(smiles_string);
 	let structure = parse_smiles(smiles_string, aromatics_map, aromatics_set, organic_set, bonds_set, smiles_chars, atom_symbols, bonds_map);
 	structure = reconstruct_aromatics(structure);
+	structure = deconstruct_aromatics(structure);
 	mol = structure_to_mol(structure);
 	alert('The resulting MOL for PASS: ' + mol);
 	txt_area.value = mol;
@@ -267,5 +268,6 @@ nav ul li a:hover {
 }
 
 </style>
+
 
 
