@@ -6,7 +6,7 @@
 //////////////////////////////////////////////////////////////////////////////
 // according to OpenSMILES (http://opensmiles.org/opensmiles.html)
 const aromatics_map = new Map();
-const aromatics_set = new Set(['b', 'c', 'n', 'o', 'p', 's', 'as', 'se', 'te']);
+const aromatics_set = new Set(['b', 'c', 'n', 'o', 'p', 's']);
 const organic_set = new Set(['B', 'C', 'N', 'O', 'P', 'S', 'F', 'Cl', 'Br', 'I', 'b', 'c', 'n', 'o', 'p', 's']);
 const bonds_set = new Set(['-', '=', '#', '$', ':', '\\', '/']);
 //Allowed characters based on the analysis of SMILES from ChEMBL v35, excluding "." - multicomponent structures are not allowed.
@@ -31,6 +31,13 @@ bonds_map.set("\\", [1]);
 bonds_map.set("/", [1]);
 
 
+// 0 Function to sort array of numbers, SEE: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort
+function compareNumbers(a, b) {
+  return a - b;
+}
+function compareNumbers_desc(a, b) {
+  return b - a;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Functions to deal with the atoms and bonds								///
@@ -371,14 +378,14 @@ function get_all_aromatic_rings (smiles) {
 	// Collect the corresponding borders to records
 	for (let i = 0; i < ring_marks.length; i++) {
 		const ring_id = ring_marks[i]['str'];
-		let ring_start = [...ring_marks[i]['pos']].toSorted()[0];
+		let ring_start = [...ring_marks[i]['pos']].sort(compareNumbers)[0];
 		ring_start = extend_start(ring_start, smiles);
-		const ring_start_fin = [...ring_marks[i]['pos']].toSorted()[[...ring_marks[i]['pos']].length-1];
+		const ring_start_fin = [...ring_marks[i]['pos']].sort(compareNumbers)[[...ring_marks[i]['pos']].length-1];
 		// Find the end of this ring if it is not ended still
 		if (!closed_rings.has(ring_id)) {
 			for (let k = 0; k < ring_marks.length; k++) {
 				const ring_id_end = ring_marks[k]['str'];
-				const ring_end = [...ring_marks[k]['pos']].toSorted()[[...ring_marks[k]['pos']].length-1];
+				const ring_end = [...ring_marks[k]['pos']].sort(compareNumbers)[[...ring_marks[k]['pos']].length-1];
 				// Pair it
 				if (ring_id === ring_id_end && i != k && ring_start < ring_end) {
 					let this_ring = {"id": i.toString() + "_" + ring_id, "start": ring_start, "end": ring_end}
@@ -863,9 +870,7 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 			for (let j = 0; j < structure_in_progress.length; j++) {
 				//Treat H differently
 				if (structure_in_progress[j]['atom_symbol']!='H' && structure_in_progress[j]['atom_start'] <= destination && structure_in_progress[j]['atom_end'] >= destination ) {
-					let bond_id = [atom_id, structure_in_progress[j]['atom_id']]
-								   .sort()
-								   .join("-");
+					let bond_id = [parseInt(atom_id), parseInt(structure_in_progress[j]['atom_id'])].sort(compareNumbers).join("-");
 					//Check if the bond is known
 					if (bond_table.has(bond_id)) {
 						//Compare bond types
@@ -897,7 +902,7 @@ function parse_smiles (smiles, aromatics_map, aromatics_set, organic_set, bonds_
 	// Bonds that are alrady finalized
 	for (let i = 0; i < structure_in_progress.length; i++) {
 		let structure_elem = {};
-		let elem_poss = Array(structure_in_progress[i]['atom_end'], structure_in_progress[i]['atom_start']).sort();
+		let elem_poss = Array(structure_in_progress[i]['atom_end'], structure_in_progress[i]['atom_start']).sort(compareNumbers);
 		let elem_id = structure_in_progress[i]['atom_id'];
 		let elem_symbol = structure_in_progress[i]['atom_symbol'];
 		let elem_charged = structure_in_progress[i]['is_charged'];
@@ -993,7 +998,6 @@ function reconstruct_aromatics (mol_structure) {
 			aromatic_adjlist.set(mol_structure['atoms'][i]['atom_id'], this_atom_pairs);
 		}
 	}
-	x = aromatic_adjlist;
 	for (let [key, value] of mol_structure['bonds']) {
 		let aromatic_status = value;
 		// Make all bonds non-aromatic 
@@ -1011,12 +1015,7 @@ function reconstruct_aromatics (mol_structure) {
 			let preventive_counter = 0;
 			do {
 				preventive_counter++;
-				console.log("search:");
-				console.log(value['start_id']);
-				console.log(value['end_id']);
-				console.log(queue);
 				let current_start = queue.shift();
-				console.log(current_start);
 				// Check if this the target atom
 				if (current_start === parseInt(value['end_id'])) {
 					aromatic_status['aromatic'] = 1;
@@ -1040,6 +1039,238 @@ function reconstruct_aromatics (mol_structure) {
 		} 
 	}
 	return mol_structure;
+}
+
+// 6. Deconstruct aromatic systems
+// use algorithm similar to RDKit for starters
+// 1) Enumerate distinct aromatic systems
+// 2) Try to replace the aromatic bonds with single and double bonds in aromatic systems in such a way that atoms' valences are OK
+// There are lot of work here, which have already been done in the previous functions, but at the moment it will be easier to do it again
+function deconstruct_aromatics (mol_structure) {
+	// Create the adjacency list to store the data on the connections of aromatic atoms
+	let aromatic_adjlist = new Map();
+	let total_atom_count = 0;
+	for (let i = 0; i < mol_structure['atoms'].length; i++) {
+		total_atom_count++
+		const this_atom_pairs = new Set();
+		if ( aromatics_set.has(mol_structure['atoms'][i]['atom_symbol']) ) {
+			for (let value of mol_structure['atoms'][i]['bonds']) {
+				let this_pair = parseInt(value.split("-").filter((element) => parseInt(element) != mol_structure['atoms'][i]['atom_id']));
+				// Filter to get corrsponding array element and atom symbol from it
+				let this_pair_symbol = mol_structure['atoms'].filter( (element) => element['atom_id'] === this_pair )[0]['atom_symbol'];
+				if (aromatics_set.has(this_pair_symbol)) {
+					this_atom_pairs.add(this_pair);
+				}
+			}
+			if (mol_structure['atoms'][i]['atom_id'] === 2) {
+			}
+			aromatic_adjlist.set(mol_structure['atoms'][i]['atom_id'], this_atom_pairs);
+		}
+	}
+	//
+	// Divide the adjacency list into the distinct components
+	//
+	// Find the components, which are already disjoint
+	const existing_components = [];
+	do {
+		// Store the current component here
+		const component = new Map();
+		// Store the queue here
+		let queue = [];
+		// Store the observead atoms here
+		let observed_atoms = new Set();
+		// Select the earliest atom among the aromatic ones
+		let current_key = Array.from(aromatic_adjlist.keys()).sort(compareNumbers)[0];
+		// Add it to the queue
+		queue.push(current_key);
+		do {
+			current_key = queue.shift();
+			observed_atoms.add(current_key);
+			// Add this atom to the current component
+			component.set(current_key, aromatic_adjlist.get(current_key));
+			// Prepare for the next step
+			// Add the atoms connected to this to the queue
+			for (let setval of aromatic_adjlist.get(current_key)) {
+				if (!observed_atoms.has(setval)) {
+				queue.push(setval);
+				observed_atoms.add(setval);
+			}
+		}
+		// delete the current atom from dataset
+		aromatic_adjlist.delete(current_key);
+		} while (queue.length > 0);
+		existing_components.push(component);
+	} while (aromatic_adjlist.size > 0);
+	// Divide the existing components further if needed via deleting bonds and checking the connectivity
+	// If the deletion of a single bond leads to the appearance of the distinct components, these are components
+	// This is checked by the function "reconstruct_aromatics" and corresponding bond is marked as non-aromatic in 'bonds' of 'mol_structure'
+	const induced_components = [];
+	// Traverse the array of existing components
+	induce_components: for (let k = 0; k < existing_components.length; k++) {
+		// Copy this existing component, which is a map having sets
+		const this_existing_component = new Map();
+		for (let [key,value] of existing_components[k]) {
+			this_existing_component.set(key, new Set([... value]));
+		}
+		// Delete the connections to the non-aromatic atoms from this component
+		for (let [key,value] of this_existing_component) {
+			for (let inner_value of value) {
+				let atom_symbol = mol_structure['atoms'].filter(element => element['atom_id'] === inner_value)[0]['atom_symbol'];
+				if ( !aromatics_set.has(atom_symbol) ) {
+					value.delete(inner_value);
+					this_existing_component.set(key,value);
+				}
+			}
+		}
+		// Get the IDs of the atoms in this component
+		const all_atom_ids = new Set(this_existing_component.keys());
+		// Find the non-aromatic bonds between the aromatic atoms
+		const non_aromatic_bonds = [];
+		for (let [key,value] of mol_structure['bonds']) {
+			if ( value['aromatic'] === 0 && all_atom_ids.has(parseInt(key.split("-")[0])) && all_atom_ids.has(parseInt(key.split("-")[0])) ) {
+				non_aromatic_bonds.push(key);
+			}
+		}
+		// Case when there are components to be induced
+		if (non_aromatic_bonds.length > 0) {
+			// Delete the non-aromatic bond from this existing component
+			for (let i = 0; i < non_aromatic_bonds.length; i++) {
+				let this_start = parseInt(non_aromatic_bonds[i].split("-")[0]);
+				let this_end = parseInt(non_aromatic_bonds[i].split("-")[1]);
+				let temp_start = this_existing_component.get(this_start);
+				let temp_end = this_existing_component.get(this_end);
+				if (typeof temp_start != "undefined") {
+					temp_start.delete(this_end);
+					if (temp_start.size > 0) {
+						this_existing_component.set(this_start, temp_start);
+					} else {
+						this_existing_component.delete(this_start);
+					}
+				}
+				if (typeof temp_end != "undefined") {
+					temp_end.delete(this_start);
+					if (temp_end.size > 0) {
+						this_existing_component.set(this_end, temp_end);
+					} else {
+						this_existing_component.delete(this_end);
+					}
+				}
+			}
+			// Induce components
+			do {
+				// Store the current component here
+				const induced_component = new Map();
+				// Store the queue here
+				let queue = [];
+				// Store the observead atoms here
+				let observed_atoms = new Set();
+				// Select the earliest atom among the aromatic ones
+				let current_key = Array.from(this_existing_component.keys()).sort(compareNumbers)[0];
+				observed_atoms.add(current_key);
+				// Add it to the queue
+				queue.push(current_key);
+				do {
+					current_key = queue.shift();
+					observed_atoms.add(current_key);
+					// Add this atom to the current component
+					induced_component.set(current_key, this_existing_component.get(current_key));
+					// Prepare for the next step
+					// Add the atoms connected to this to the queue
+					for (let setval of this_existing_component.get(current_key)) {
+						if (!observed_atoms.has(setval)) {
+							queue.push(setval);
+							observed_atoms.add(setval);
+						}
+					}
+					// delete the current atom from dataset
+					this_existing_component.delete(current_key);
+				} while (queue.length > 0);
+				induced_components.push(induced_component);
+			} while (existing_components.size > 0); 
+		}
+		induced_components.push(this_existing_component);
+	}
+	
+	// Modify bonds in the distinct components: replace aromatic bonds with the - OR =
+	// #red skip atoms, to which the double bond had already been assigned
+	if (induced_components.length > 0) {
+		// Create set to store the modified atoms
+		modified_aromatic_atoms = new Set();
+		for (let i = 0; i < induced_components.length; i++) {
+			const this_component = induced_components[i];
+			const bond_set = new Set();
+			const start_set = new Set();
+			const end_set = new Set();
+			for (let [key,value] of this_component) {
+			  	for (let inner_value of value) {
+			  		const bond = Math.min(key, inner_value) + '-' + Math.max(key, inner_value);
+			  		bond_set.add(bond);
+			  		start_set.add(Math.min(key, inner_value));
+			  		end_set.add(Math.max(key, inner_value));
+			  	}
+			}
+			let start_arr = [...start_set].sort(compareNumbers);
+			let end_arr = [...end_set].sort(compareNumbers);
+			// Sort Bonds, then Modify Bonds and Atoms from this set
+			evaluate_aromatic_atom: for (k = 0; k < start_arr.length; k++) {
+				let this_start = start_arr[k];
+				for (j = 0; j < end_arr.length; j++) {
+					let this_end = end_arr[j];
+					let this_bond = this_start + '-' + this_end;
+					if (bond_set.has(this_bond)) {
+						// Get this bond
+						const data_bond_old = mol_structure['bonds'].get(this_bond);
+						const data_bond = JSON.parse(JSON.stringify(data_bond_old));
+						data_bond['aromatic'] = 0;
+						// Check if it is possible to convert this bond to double bond
+						let atom_start = mol_structure['atoms'].filter(element => element['atom_id'] === this_start)[0];
+						let atom_end = mol_structure['atoms'].filter(element => element['atom_id'] === this_end)[0];
+						let atom_start_symb = atom_start['atom_symbol'];
+						let atom_end_symb = atom_end['atom_symbol'];
+						// Check correspondance to the max valence for atoms
+						// Prepare
+						let atom_end_qbond = 0;
+						for (let value of atom_end['bonds']) {
+							let bond = mol_structure['bonds'].get(value);
+							if (bond['type'] === '-' | bond['type'] === '/' | bond['type'] === '\\' | bond['type'] === ':') {atom_end_qbond = atom_end_qbond + 1;}
+							if (bond['type'] === '=') {atom_end_qbond = atom_end_qbond + 2;}
+							if (bond['type'] === '#') {atom_end_qbond = atom_end_qbond + 3;}
+							if (bond['type'] === '$') {atom_end_qbond = atom_end_qbond + 4;}
+						}
+						let atom_end_val = Math.abs(atom_end['charge_quant']) + atom_end_qbond;
+						let atom_start_qbond = 0;
+						for (let value of atom_start['bonds']) {
+							let bond = mol_structure['bonds'].get(value);
+							if (bond['type'] === '-' | bond['type'] === '/' | bond['type'] === '\\' | bond['type'] === ':') {atom_start_qbond = atom_start_qbond + 1;}
+							if (bond['type'] === '=') {atom_start_qbond = atom_start_qbond + 2;}
+							if (bond['type'] === '#') {atom_start_qbond = atom_start_qbond + 3;}
+							if (bond['type'] === '$') {atom_start_qbond = atom_start_qbond + 4;}
+						}
+						let atom_start_val = Math.abs(atom_start['charge_quant']) + atom_start_qbond;
+						// Check
+						if ( !modified_aromatic_atoms.has(atom_start) &&
+							 !modified_aromatic_atoms.has(atom_end) &&
+								atom_start_val + 1 <= [...aromatics_map.get(atom_start_symb)].sort(compareNumbers_desc)[0] &&
+								atom_end_val + 1 <= [...aromatics_map.get(atom_end_symb)].sort(compareNumbers_desc)[0] ) {
+							// Modify atoms and bonds
+							data_bond['type'] = "=";
+							mol_structure['bonds'].set(this_bond, data_bond);
+							// Mark the corresponding atoms as modified
+							modified_aromatic_atoms.add(atom_start);
+							modified_aromatic_atoms.add(atom_end);
+							// Move to the next starting atom
+							//continue evaluate_aromatic_atom;
+						} else {
+							data_bond['type'] = "-";
+							mol_structure['bonds'].set(this_bond, data_bond);
+						}
+						mol_structure['bonds'].set(this_bond, data_bond);
+					}
+				}
+			}
+		}
+	return mol_structure;
+	}
 }
 
 // Export structure to MOL just for PASS, coordinates will not be computed
